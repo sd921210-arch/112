@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+  <script>
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzYs3HMn0sU6MEDk--Cukn1zPWVReT7hHF3qGxUf0Tm_douUBLYT6hS9Z6GN6g4Ycdi/exec';
+  </script>
+
+  <title>AI 안전모 검사</title>
+
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #64748b;
+      --line: #e5e7eb;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --ok: #16a34a;
+      --ok-bg: #dcfce7;
+      --ng: #dc2626;
+      --ng-bg: #fee2e2;
+      --warn-bg: #fff7ed;
+      --warn-text: #9a3412;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', Arial, sans-serif;
+      min-height: 100vh;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 14px;
+    }
+
+    .title {
+      margin: 8px 0 14px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .sub {
+      margin-top: -8px;
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 0 8px 26px rgba(15, 23, 42, 0.06);
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 7px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      height: 48px;
+      border: 1px solid #cbd5e1;
+      border-radius: 13px;
+      padding: 0 13px;
+      font-size: 16px;
+      outline: none;
+      background: #fff;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .field { margin-bottom: 12px; }
+
+    .agree {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 13px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+    }
+
+    .agree input {
+      width: 20px;
+      height: 20px;
+      margin-top: 1px;
+      flex: 0 0 auto;
+    }
+
+    .agree span {
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.45;
+    }
+
+    .cameraBox {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #0f172a;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid #111827;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      display: block;
+      background: #0f172a;
+    }
+
+    .guideOval {
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      width: 58%;
+      height: 72%;
+      transform: translate(-50%, -50%);
+      border: 3px solid rgba(255, 255, 255, 0.85);
+      border-radius: 50%;
+      pointer-events: none;
+      box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.08);
+    }
+
+    .cameraHint {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      color: white;
+      font-size: 12px;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 999px;
+      padding: 8px 10px;
+      backdrop-filter: blur(6px);
+    }
+
+    .btnRow {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      height: 50px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btnSecondary {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .btnPrimary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btnPrimary:active { background: var(--primary-dark); }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .resultBox {
+      display: none;
+      border-radius: 18px;
+      padding: 16px;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+    }
+
+    .resultBox.ok {
+      display: block;
+      background: var(--ok-bg);
+      border-color: #86efac;
+      color: #14532d;
+    }
+
+    .resultBox.ng {
+      display: block;
+      background: var(--ng-bg);
+      border-color: #fecaca;
+      color: #7f1d1d;
+    }
+
+    .resultSign {
+      font-size: 46px;
+      font-weight: 900;
+      letter-spacing: -0.06em;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .resultText {
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .pillGrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .pill {
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 12px;
+      padding: 9px 6px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.45;
+      min-height: 20px;
+      white-space: pre-line;
+    }
+
+    .notice {
+      background: var(--warn-bg);
+      color: var(--warn-text);
+      border: 1px solid #fed7aa;
+      border-radius: 14px;
+      padding: 11px 12px;
+      font-size: 12px;
+      line-height: 1.45;
+      margin-top: 12px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: -2px;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    canvas { display: none; }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <h1 class="title">AI 안전모 검사</h1>
+    <div class="sub">카메라 화면에 얼굴과 안전모가 보이게 맞춘 뒤, 현재 화면을 바로 AI 분석합니다.</div>
+
+    <div class="card">
+      <div class="field">
+        <label for="nameInput">이름</label>
+        <input id="nameInput" type="text" autocomplete="name" placeholder="예: 홍길동">
+      </div>
+
+      <div class="field">
+        <label for="siteInput">현장명</label>
+        <input id="siteInput" type="text" autocomplete="off" placeholder="예: 김해삼계 현장">
+      </div>
+
+      <label class="agree" for="consentInput">
+        <input id="consentInput" type="checkbox">
+        <span>촬영 화면의 현재 프레임을 AI 안전보호구 분석에 사용하고, 검사 결과가 스프레드시트에 저장되는 것에 동의합니다. 이미지는 시트에 저장하지 않습니다.</span>
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="cameraBox">
+        <video id="video" autoplay muted playsinline></video>
+        <div class="guideOval"></div>
+        <div class="cameraHint">얼굴 정면 · 안전모 전체 · 턱끈이 보이게 맞춰주세요</div>
+      </div>
+
+      <div class="btnRow">
+        <button id="cameraBtn" class="btnSecondary" type="button">카메라 시작</button>
+        <button id="analyzeBtn" class="btnPrimary" type="button" disabled>AI 분석</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div id="resultBox" class="resultBox">
+        <div id="resultSign" class="resultSign"></div>
+        <div id="resultText" class="resultText"></div>
+        <div class="pillGrid">
+          <div id="helmetPill" class="pill">안전모 -</div>
+          <div id="strapPill" class="pill">턱끈 -</div>
+          <div id="facePill" class="pill">감지 -</div>
+        </div>
+      </div>
+
+      <div class="notice">
+        이번 버전은 iframe/form이 아니라 <b>no-cors POST + JSONP 결과조회</b> 방식입니다. 분석 실패 시 요청ID로 Apps Script 실행 기록과 오류로그 시트를 확인하세요.
+      </div>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const cameraBtn = document.getElementById('cameraBtn');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const statusEl = document.getElementById('status');
+    const resultBox = document.getElementById('resultBox');
+    const resultSign = document.getElementById('resultSign');
+    const resultText = document.getElementById('resultText');
+    const helmetPill = document.getElementById('helmetPill');
+    const strapPill = document.getElementById('strapPill');
+    const facePill = document.getElementById('facePill');
+
+    let stream = null;
+    let isAnalyzing = false;
+    let currentRequestId = '';
+    let pollCount = 0;
+    let pollTimer = null;
+
+    cameraBtn.addEventListener('click', () => startCamera(false));
+    analyzeBtn.addEventListener('click', analyzeCurrentFrame);
+
+    window.addEventListener('load', () => {
+      setStatus('카메라 시작 버튼을 누르거나, 권한 요청이 뜨면 허용해 주세요.');
+      startCamera(true);
+    });
+
+    async function startCamera(silent) {
+      if (stream) return;
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setStatus('이 브라우저는 카메라 기능을 지원하지 않습니다. Chrome 또는 Samsung Internet으로 열어주세요.');
+        return;
+      }
+
+      try {
+        setStatus('카메라 권한 확인 중...');
+
+        const constraints = {
+          audio: false,
+          video: {
+            facingMode: 'user',
+            width: { ideal: 360 },
+            height: { ideal: 360 }
+          }
+        };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+
+        await new Promise((resolve) => {
+          video.onloadedmetadata = () => resolve();
+        });
+
+        await video.play();
+        analyzeBtn.disabled = false;
+        cameraBtn.textContent = '카메라 실행중';
+        cameraBtn.disabled = true;
+        setStatus('카메라 준비 완료. 얼굴, 안전모, 턱끈이 잘 보이면 AI 분석을 누르세요.');
+      } catch (err) {
+        stream = null;
+        analyzeBtn.disabled = true;
+
+        if (!silent) {
+          setStatus('카메라 실행 실패: ' + getCameraErrorMessage(err));
+        } else {
+          setStatus('카메라 시작 버튼을 눌러 권한을 허용해 주세요.');
+        }
+      }
+    }
+
+    function getCameraErrorMessage(err) {
+      const name = err && err.name ? err.name : '';
+      if (name === 'NotAllowedError') return '권한이 차단되었습니다. 브라우저 주소창/사이트 설정에서 카메라를 허용해 주세요.';
+      if (name === 'NotFoundError') return '사용 가능한 카메라를 찾지 못했습니다.';
+      if (name === 'NotReadableError') return '다른 앱이 카메라를 사용 중일 수 있습니다.';
+      if (name === 'OverconstrainedError') return '카메라 조건을 만족하지 못했습니다. 다른 브라우저로 시도해 주세요.';
+      return (err && err.message) ? err.message : String(err);
+    }
+
+    function validateForm() {
+      const name = document.getElementById('nameInput').value.trim();
+      const siteName = document.getElementById('siteInput').value.trim();
+      const consent = document.getElementById('consentInput').checked;
+
+      if (!GAS_WEB_APP_URL || !GAS_WEB_APP_URL.includes('/exec')) throw new Error('GAS 웹앱 /exec 주소가 올바르지 않습니다.');
+      if (!name) throw new Error('이름을 입력해 주세요.');
+      if (!siteName) throw new Error('현장명을 입력해 주세요.');
+      if (!consent) throw new Error('촬영동의 체크가 필요합니다.');
+      if (!stream || !video.videoWidth || !video.videoHeight) throw new Error('카메라가 아직 준비되지 않았습니다.');
+
+      return { name, siteName, consent };
+    }
+
+    function captureLowResJpeg() {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const outputSize = 256;
+
+      const cropSize = Math.min(vw, vh);
+      const sx = Math.floor((vw - cropSize) / 2);
+      const sy = Math.floor((vh - cropSize) / 2);
+
+      canvas.width = outputSize;
+      canvas.height = outputSize;
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: false });
+      ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, outputSize, outputSize);
+
+      return canvas.toDataURL('image/jpeg', 0.32);
+    }
+
+    function makeRequestId() {
+      return 'REQ-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    }
+
+    async function analyzeCurrentFrame() {
+      if (isAnalyzing) return;
+
+      let form;
+      try {
+        form = validateForm();
+      } catch (err) {
+        showError(err.message || String(err));
+        return;
+      }
+
+      const imageDataUrl = captureLowResJpeg();
+      currentRequestId = makeRequestId();
+      pollCount = 0;
+
+      const payload = {
+        requestId: currentRequestId,
+        name: form.name,
+        siteName: form.siteName,
+        consent: form.consent,
+        imageDataUrl,
+        clientInfo: {
+          userAgent: navigator.userAgent,
+          screen: `${window.innerWidth}x${window.innerHeight} / dpr:${window.devicePixelRatio || 1}`,
+          pageUrl: location.href,
+          time: new Date().toISOString()
+        }
+      };
+
+      isAnalyzing = true;
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<span class="spinner"></span>분석중';
+      clearResult();
+
+      setStatus('GAS 서버로 분석 요청 전송 중...\n요청ID: ' + currentRequestId);
+
+      try {
+        await fetch(GAS_WEB_APP_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        finishAsError(
+          'GAS 서버로 요청 전송 자체가 실패했습니다.\n' +
+          '현재 사이트가 외부 요청을 차단했을 수 있습니다.\n\n' +
+          '오류: ' + (err.message || String(err))
+        );
+        return;
+      }
+
+      setStatus(
+        '요청 전송 완료. GAS 실행 기록에 doPost가 찍히는지 확인하세요.\n' +
+        'Gemini 분석 결과를 조회 중입니다...\n' +
+        '요청ID: ' + currentRequestId
+      );
+
+      startPollingResult(currentRequestId);
+    }
+
+    function startPollingResult(requestId) {
+      clearTimeout(pollTimer);
+
+      pollTimer = setTimeout(() => {
+        pollResult(requestId);
+      }, 2500);
+    }
+
+    function pollResult(requestId) {
+      pollCount++;
+
+      if (pollCount > 60) {
+        finishAsError(
+          '결과 조회 시간이 초과되었습니다.\n\n' +
+          '요청ID: ' + requestId + '\n' +
+          '확인사항:\n' +
+          '1) Apps Script 실행 기록에 doPost가 찍혔는지\n' +
+          '2) AI안전검사_오류로그 시트에 ERROR가 있는지\n' +
+          '3) 배포 권한이 모든 사용자로 되어 있는지\n' +
+          '4) Code.gs 수정 후 새 버전 배포했는지'
+        );
+        return;
+      }
+
+      setStatus(
+        'Gemini 분석 결과 조회 중... ' + pollCount + '/60\n' +
+        '요청ID: ' + requestId
+      );
+
+      const callbackName = '__gasResultCallback_' + requestId.replace(/[^a-zA-Z0-9_]/g, '_') + '_' + pollCount;
+
+      window[callbackName] = function(data) {
+        try {
+          delete window[callbackName];
+        } catch (e) {
+          window[callbackName] = undefined;
+        }
+
+        if (!data || data.status === 'PENDING') {
+          startPollingResult(requestId);
+          return;
+        }
+
+        if (data.status === 'ERROR' || data.success === false) {
+          finishAsError(data.message || 'GAS 분석 중 오류가 발생했습니다.');
+          return;
+        }
+
+        if (data.status === 'DONE' && data.success) {
+          finishAsSuccess(data);
+          return;
+        }
+
+        startPollingResult(requestId);
+      };
+
+      const script = document.createElement('script');
+      script.src =
+        GAS_WEB_APP_URL +
+        '?action=result' +
+        '&requestId=' + encodeURIComponent(requestId) +
+        '&callback=' + encodeURIComponent(callbackName) +
+        '&t=' + Date.now();
+
+      script.onerror = function() {
+        try {
+          delete window[callbackName];
+        } catch (e) {}
+        startPollingResult(requestId);
+      };
+
+      document.body.appendChild(script);
+
+      setTimeout(() => {
+        if (script && script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      }, 10000);
+    }
+
+    function finishAsSuccess(data) {
+      clearTimeout(pollTimer);
+      isAnalyzing = false;
+      analyzeBtn.disabled = false;
+      analyzeBtn.textContent = 'AI 분석';
+
+      showResult(data.result, data.rowNumber, data.requestId || currentRequestId);
+    }
+
+    function finishAsError(message) {
+      clearTimeout(pollTimer);
+      isAnalyzing = false;
+      analyzeBtn.disabled = false;
+      analyzeBtn.textContent = 'AI 분석';
+      showError(message);
+    }
+
+    function showResult(result, rowNumber, requestId) {
+      const isOk = result.overall === 'OK';
+      resultBox.className = 'resultBox ' + (isOk ? 'ok' : 'ng');
+      resultSign.textContent = isOk ? 'OK' : 'NG';
+      resultText.textContent =
+        `${result.reason || ''}\n${result.action || ''}\n저장 완료: ${rowNumber}행\n요청ID: ${requestId || currentRequestId}`;
+
+      helmetPill.textContent = '안전모 ' + (result.hardhat || '-');
+      strapPill.textContent = '턱끈 ' + (result.chinstrap || '-');
+      facePill.textContent = '감지 ' + (result.personVisible ? 'Y' : 'N');
+
+      setStatus('분석 및 스프레드시트 저장이 완료되었습니다.');
+    }
+
+    function showError(message) {
+      resultBox.className = 'resultBox ng';
+      resultSign.textContent = 'NG';
+      resultText.textContent = message;
+      helmetPill.textContent = '안전모 -';
+      strapPill.textContent = '턱끈 -';
+      facePill.textContent = '감지 -';
+      setStatus(message);
+    }
+
+    function clearResult() {
+      resultBox.className = 'resultBox';
+      resultSign.textContent = '';
+      resultText.textContent = '';
+      helmetPill.textContent = '안전모 -';
+      strapPill.textContent = '턱끈 -';
+      facePill.textContent = '감지 -';
+    }
+
+    function setStatus(message) {
+      statusEl.textContent = message || '';
+    }
+  </script>
+</body>
+</html>
