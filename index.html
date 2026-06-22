@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzYs3HMn0sU6MEDk--Cukn1zPWVReT7hHF3qGxUf0Tm_douUBLYT6hS9Z6GN6g4Ycdi/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwSDKWQV7LAza5KnG5zKNvSxoyjXarOrtlF6eIweHbP7FmIXxh1MKL5qh9AxScaw0xq/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -142,10 +142,48 @@
       width: 58%;
       height: 72%;
       transform: translate(-50%, -50%);
-      border: 3px solid rgba(255, 255, 255, 0.85);
+      border: 3px solid rgba(255, 255, 255, 0.55);
       border-radius: 50%;
       pointer-events: none;
-      box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.06);
+      z-index: 2;
+    }
+
+    .animalCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .animalPicker {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 10px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      z-index: 4;
+    }
+
+    .animalBtn {
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      background: rgba(15, 23, 42, 0.55);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 800;
+      backdrop-filter: blur(6px);
+      cursor: pointer;
+    }
+
+    .animalBtn.active {
+      background: rgba(37, 99, 235, 0.92);
+      border-color: rgba(255, 255, 255, 0.85);
     }
 
     .cameraHint {
@@ -160,6 +198,7 @@
       border-radius: 999px;
       padding: 8px 10px;
       backdrop-filter: blur(6px);
+      z-index: 4;
     }
 
     .btnRow {
@@ -258,17 +297,6 @@
       white-space: pre-line;
     }
 
-    .notice {
-      background: var(--warn-bg);
-      color: var(--warn-text);
-      border: 1px solid #fed7aa;
-      border-radius: 14px;
-      padding: 11px 12px;
-      font-size: 12px;
-      line-height: 1.45;
-      margin-top: 12px;
-    }
-
     .spinner {
       display: inline-block;
       width: 14px;
@@ -285,14 +313,14 @@
       to { transform: rotate(360deg); }
     }
 
-    canvas { display: none; }
+    #captureCanvas { display: none; }
   </style>
 </head>
 
 <body>
   <div class="app">
     <h1 class="title">AI 안전모 검사</h1>
-    <div class="sub">카메라 화면에 얼굴과 안전모가 보이게 맞춘 뒤, 현재 화면을 바로 AI 분석합니다.</div>
+    <div class="sub">얼굴, 안전모, 턱끈이 보이게 맞춘 뒤 검사하세요.</div>
 
     <div class="card">
       <div class="field">
@@ -307,20 +335,30 @@
 
       <label class="agree" for="consentInput">
         <input id="consentInput" type="checkbox">
-        <span>촬영 화면의 현재 프레임을 AI 안전보호구 분석에 사용하고, 검사 결과가 스프레드시트에 저장되는 것에 동의합니다. 이미지는 시트에 저장하지 않습니다.</span>
+        <span>현재 카메라 프레임을 AI 안전보호구 검사에 사용하고, 검사 결과를 스프레드시트에 저장하는 것에 동의합니다. 이미지는 저장하지 않습니다.</span>
       </label>
     </div>
 
     <div class="card">
-      <div class="cameraBox">
+      <div class="cameraBox" id="cameraBox">
         <video id="video" autoplay muted playsinline></video>
+
+        <div class="animalPicker" aria-label="동물 얼굴 선택">
+          <button class="animalBtn active" type="button" data-animal="lion" title="사자">🦁</button>
+          <button class="animalBtn" type="button" data-animal="tiger" title="호랑이">🐯</button>
+          <button class="animalBtn" type="button" data-animal="panda" title="팬더">🐼</button>
+          <button class="animalBtn" type="button" data-animal="squirrel" title="다람쥐">🐿️</button>
+          <button class="animalBtn" type="button" data-animal="rabbit" title="토끼">🐰</button>
+        </div>
+
         <div class="guideOval"></div>
+        <canvas id="animalCanvas" class="animalCanvas"></canvas>
         <div class="cameraHint">얼굴 정면 · 안전모 전체 · 턱끈이 보이게 맞춰주세요</div>
       </div>
 
       <div class="btnRow">
         <button id="cameraBtn" class="btnSecondary" type="button">카메라 시작</button>
-        <button id="analyzeBtn" class="btnPrimary" type="button" disabled>AI 분석</button>
+        <button id="analyzeBtn" class="btnPrimary" type="button" disabled>검사</button>
       </div>
 
       <div id="status" class="status"></div>
@@ -334,18 +372,16 @@
           <div id="facePill" class="pill">감지 -</div>
         </div>
       </div>
-
-      <div class="notice">
-        이번 버전은 iframe/form이 아니라 <b>no-cors POST + JSONP 결과조회</b> 방식입니다. 분석 실패 시 요청ID로 Apps Script 실행 기록과 오류로그 시트를 확인하세요.
-      </div>
     </div>
   </div>
 
-  <canvas id="canvas"></canvas>
+  <canvas id="captureCanvas"></canvas>
 
   <script>
     const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
+    const captureCanvas = document.getElementById('captureCanvas');
+    const animalCanvas = document.getElementById('animalCanvas');
+    const cameraBox = document.getElementById('cameraBox');
     const cameraBtn = document.getElementById('cameraBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const statusEl = document.getElementById('status');
@@ -355,31 +391,108 @@
     const helmetPill = document.getElementById('helmetPill');
     const strapPill = document.getElementById('strapPill');
     const facePill = document.getElementById('facePill');
+    const nameInput = document.getElementById('nameInput');
+    const siteInput = document.getElementById('siteInput');
+    const consentInput = document.getElementById('consentInput');
+    const animalButtons = Array.from(document.querySelectorAll('.animalBtn'));
+
+    const STORAGE_KEY = 'helmetSafetyInputs:v1';
+    const STORAGE_TTL = 24 * 60 * 60 * 1000;
+    const CAPTURE_SIZE = 224;
+    const CAPTURE_QUALITY = 0.34;
 
     let stream = null;
     let isAnalyzing = false;
     let currentRequestId = '';
     let pollCount = 0;
     let pollTimer = null;
+    let selectedAnimal = 'lion';
+    let faceDetector = null;
+    let detectorReady = false;
+    let detectorUnavailable = false;
+    let lastDetectedFace = null;
+    let lastDetectionAt = 0;
+    let overlayLoopStarted = false;
 
     cameraBtn.addEventListener('click', () => startCamera(false));
     analyzeBtn.addEventListener('click', analyzeCurrentFrame);
 
+    nameInput.addEventListener('input', saveSavedInputs);
+    siteInput.addEventListener('input', saveSavedInputs);
+
+    animalButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedAnimal = button.dataset.animal || 'lion';
+        animalButtons.forEach((item) => item.classList.toggle('active', item === button));
+      });
+    });
+
+    window.addEventListener('resize', resizeAnimalCanvas);
+
     window.addEventListener('load', () => {
-      setStatus('카메라 시작 버튼을 누르거나, 권한 요청이 뜨면 허용해 주세요.');
+      loadSavedInputs();
+      initFaceDetector();
+      setStatus('카메라를 허용해 주세요.');
       startCamera(true);
     });
+
+    function loadSavedInputs() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+
+        const saved = JSON.parse(raw);
+
+        if (!saved || !saved.expiresAt || Date.now() > saved.expiresAt) {
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+
+        nameInput.value = saved.name || '';
+        siteInput.value = saved.siteName || '';
+      } catch (err) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+
+    function saveSavedInputs() {
+      const name = nameInput.value.trim();
+      const siteName = siteInput.value.trim();
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          name,
+          siteName,
+          expiresAt: Date.now() + STORAGE_TTL
+        }));
+      } catch (err) {}
+    }
+
+    function initFaceDetector() {
+      try {
+        if ('FaceDetector' in window) {
+          faceDetector = new FaceDetector({
+            fastMode: true,
+            maxDetectedFaces: 1
+          });
+          detectorReady = true;
+        }
+      } catch (err) {
+        faceDetector = null;
+        detectorUnavailable = true;
+      }
+    }
 
     async function startCamera(silent) {
       if (stream) return;
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setStatus('이 브라우저는 카메라 기능을 지원하지 않습니다. Chrome 또는 Samsung Internet으로 열어주세요.');
+        setStatus('카메라 기능을 지원하는 브라우저로 열어주세요.');
         return;
       }
 
       try {
-        setStatus('카메라 권한 확인 중...');
+        setStatus('카메라 준비 중');
 
         const constraints = {
           audio: false,
@@ -398,37 +511,43 @@
         });
 
         await video.play();
+
+        resizeAnimalCanvas();
+        startAnimalOverlayLoop();
+
         analyzeBtn.disabled = false;
         cameraBtn.textContent = '카메라 실행중';
         cameraBtn.disabled = true;
-        setStatus('카메라 준비 완료. 얼굴, 안전모, 턱끈이 잘 보이면 AI 분석을 누르세요.');
+        setStatus('검사 준비 완료');
       } catch (err) {
         stream = null;
         analyzeBtn.disabled = true;
 
         if (!silent) {
-          setStatus('카메라 실행 실패: ' + getCameraErrorMessage(err));
+          setStatus(getCameraErrorMessage(err));
         } else {
-          setStatus('카메라 시작 버튼을 눌러 권한을 허용해 주세요.');
+          setStatus('카메라 시작 버튼을 눌러주세요.');
         }
       }
     }
 
     function getCameraErrorMessage(err) {
       const name = err && err.name ? err.name : '';
-      if (name === 'NotAllowedError') return '권한이 차단되었습니다. 브라우저 주소창/사이트 설정에서 카메라를 허용해 주세요.';
+
+      if (name === 'NotAllowedError') return '카메라 권한을 허용해 주세요.';
       if (name === 'NotFoundError') return '사용 가능한 카메라를 찾지 못했습니다.';
       if (name === 'NotReadableError') return '다른 앱이 카메라를 사용 중일 수 있습니다.';
-      if (name === 'OverconstrainedError') return '카메라 조건을 만족하지 못했습니다. 다른 브라우저로 시도해 주세요.';
-      return (err && err.message) ? err.message : String(err);
+      if (name === 'OverconstrainedError') return '카메라 설정을 불러오지 못했습니다.';
+
+      return '카메라를 시작하지 못했습니다.';
     }
 
     function validateForm() {
-      const name = document.getElementById('nameInput').value.trim();
-      const siteName = document.getElementById('siteInput').value.trim();
-      const consent = document.getElementById('consentInput').checked;
+      const name = nameInput.value.trim();
+      const siteName = siteInput.value.trim();
+      const consent = consentInput.checked;
 
-      if (!GAS_WEB_APP_URL || !GAS_WEB_APP_URL.includes('/exec')) throw new Error('GAS 웹앱 /exec 주소가 올바르지 않습니다.');
+      if (!GAS_WEB_APP_URL || !GAS_WEB_APP_URL.includes('/exec')) throw new Error('검사 주소 설정이 필요합니다.');
       if (!name) throw new Error('이름을 입력해 주세요.');
       if (!siteName) throw new Error('현장명을 입력해 주세요.');
       if (!consent) throw new Error('촬영동의 체크가 필요합니다.');
@@ -440,19 +559,18 @@
     function captureLowResJpeg() {
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-      const outputSize = 256;
 
       const cropSize = Math.min(vw, vh);
       const sx = Math.floor((vw - cropSize) / 2);
       const sy = Math.floor((vh - cropSize) / 2);
 
-      canvas.width = outputSize;
-      canvas.height = outputSize;
+      captureCanvas.width = CAPTURE_SIZE;
+      captureCanvas.height = CAPTURE_SIZE;
 
-      const ctx = canvas.getContext('2d', { willReadFrequently: false });
-      ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, outputSize, outputSize);
+      const ctx = captureCanvas.getContext('2d', { willReadFrequently: false });
+      ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
 
-      return canvas.toDataURL('image/jpeg', 0.32);
+      return captureCanvas.toDataURL('image/jpeg', CAPTURE_QUALITY);
     }
 
     function makeRequestId() {
@@ -463,6 +581,7 @@
       if (isAnalyzing) return;
 
       let form;
+
       try {
         form = validateForm();
       } catch (err) {
@@ -470,7 +589,10 @@
         return;
       }
 
+      saveSavedInputs();
+
       const imageDataUrl = captureLowResJpeg();
+
       currentRequestId = makeRequestId();
       pollCount = 0;
 
@@ -490,10 +612,9 @@
 
       isAnalyzing = true;
       analyzeBtn.disabled = true;
-      analyzeBtn.innerHTML = '<span class="spinner"></span>분석중';
+      analyzeBtn.innerHTML = '<span class="spinner"></span>검사 중';
       clearResult();
-
-      setStatus('GAS 서버로 분석 요청 전송 중...\n요청ID: ' + currentRequestId);
+      setStatus('검사 중');
 
       try {
         await fetch(GAS_WEB_APP_URL, {
@@ -505,19 +626,9 @@
           body: JSON.stringify(payload)
         });
       } catch (err) {
-        finishAsError(
-          'GAS 서버로 요청 전송 자체가 실패했습니다.\n' +
-          '현재 사이트가 외부 요청을 차단했을 수 있습니다.\n\n' +
-          '오류: ' + (err.message || String(err))
-        );
+        finishAsError('요청 전송에 실패했습니다. 네트워크 상태를 확인해 주세요.');
         return;
       }
-
-      setStatus(
-        '요청 전송 완료. GAS 실행 기록에 doPost가 찍히는지 확인하세요.\n' +
-        'Gemini 분석 결과를 조회 중입니다...\n' +
-        '요청ID: ' + currentRequestId
-      );
 
       startPollingResult(currentRequestId);
     }
@@ -527,36 +638,25 @@
 
       pollTimer = setTimeout(() => {
         pollResult(requestId);
-      }, 2500);
+      }, 1500);
     }
 
     function pollResult(requestId) {
       pollCount++;
 
-      if (pollCount > 60) {
-        finishAsError(
-          '결과 조회 시간이 초과되었습니다.\n\n' +
-          '요청ID: ' + requestId + '\n' +
-          '확인사항:\n' +
-          '1) Apps Script 실행 기록에 doPost가 찍혔는지\n' +
-          '2) AI안전검사_오류로그 시트에 ERROR가 있는지\n' +
-          '3) 배포 권한이 모든 사용자로 되어 있는지\n' +
-          '4) Code.gs 수정 후 새 버전 배포했는지'
-        );
+      if (pollCount > 40) {
+        finishAsError('검사 시간이 초과되었습니다. 다시 시도해 주세요.');
         return;
       }
 
-      setStatus(
-        'Gemini 분석 결과 조회 중... ' + pollCount + '/60\n' +
-        '요청ID: ' + requestId
-      );
+      setStatus('검사 중');
 
       const callbackName = '__gasResultCallback_' + requestId.replace(/[^a-zA-Z0-9_]/g, '_') + '_' + pollCount;
 
       window[callbackName] = function(data) {
         try {
           delete window[callbackName];
-        } catch (e) {
+        } catch (err) {
           window[callbackName] = undefined;
         }
 
@@ -566,7 +666,7 @@
         }
 
         if (data.status === 'ERROR' || data.success === false) {
-          finishAsError(data.message || 'GAS 분석 중 오류가 발생했습니다.');
+          finishAsError(data.message || '검사 중 오류가 발생했습니다.');
           return;
         }
 
@@ -589,7 +689,7 @@
       script.onerror = function() {
         try {
           delete window[callbackName];
-        } catch (e) {}
+        } catch (err) {}
         startPollingResult(requestId);
       };
 
@@ -606,31 +706,31 @@
       clearTimeout(pollTimer);
       isAnalyzing = false;
       analyzeBtn.disabled = false;
-      analyzeBtn.textContent = 'AI 분석';
+      analyzeBtn.textContent = '검사';
 
-      showResult(data.result, data.rowNumber, data.requestId || currentRequestId);
+      showResult(data.result);
     }
 
     function finishAsError(message) {
       clearTimeout(pollTimer);
       isAnalyzing = false;
       analyzeBtn.disabled = false;
-      analyzeBtn.textContent = 'AI 분석';
+      analyzeBtn.textContent = '검사';
       showError(message);
     }
 
-    function showResult(result, rowNumber, requestId) {
+    function showResult(result) {
       const isOk = result.overall === 'OK';
+
       resultBox.className = 'resultBox ' + (isOk ? 'ok' : 'ng');
       resultSign.textContent = isOk ? 'OK' : 'NG';
-      resultText.textContent =
-        `${result.reason || ''}\n${result.action || ''}\n저장 완료: ${rowNumber}행\n요청ID: ${requestId || currentRequestId}`;
+      resultText.textContent = `${result.reason || ''}\n${result.action || ''}`;
 
       helmetPill.textContent = '안전모 ' + (result.hardhat || '-');
       strapPill.textContent = '턱끈 ' + (result.chinstrap || '-');
       facePill.textContent = '감지 ' + (result.personVisible ? 'Y' : 'N');
 
-      setStatus('분석 및 스프레드시트 저장이 완료되었습니다.');
+      setStatus('검사 완료');
     }
 
     function showError(message) {
@@ -654,6 +754,353 @@
 
     function setStatus(message) {
       statusEl.textContent = message || '';
+    }
+
+    function resizeAnimalCanvas() {
+      const rect = cameraBox.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+
+      if (!rect.width || !rect.height) return;
+
+      const targetWidth = Math.round(rect.width * dpr);
+      const targetHeight = Math.round(rect.height * dpr);
+
+      if (animalCanvas.width !== targetWidth || animalCanvas.height !== targetHeight) {
+        animalCanvas.width = targetWidth;
+        animalCanvas.height = targetHeight;
+        animalCanvas.style.width = rect.width + 'px';
+        animalCanvas.style.height = rect.height + 'px';
+      }
+    }
+
+    function startAnimalOverlayLoop() {
+      if (overlayLoopStarted) return;
+
+      overlayLoopStarted = true;
+      requestAnimationFrame(drawAnimalOverlayLoop);
+    }
+
+    async function drawAnimalOverlayLoop() {
+      resizeAnimalCanvas();
+
+      if (stream && video.videoWidth && video.videoHeight) {
+        await updateFaceDetection();
+        drawAnimalOverlay();
+      }
+
+      requestAnimationFrame(drawAnimalOverlayLoop);
+    }
+
+    async function updateFaceDetection() {
+      const now = Date.now();
+
+      if (!detectorReady || detectorUnavailable || !faceDetector) {
+        return;
+      }
+
+      if (now - lastDetectionAt < 120) {
+        return;
+      }
+
+      lastDetectionAt = now;
+
+      try {
+        const faces = await faceDetector.detect(video);
+        lastDetectedFace = faces && faces.length ? faces[0].boundingBox : null;
+      } catch (err) {
+        lastDetectedFace = null;
+        detectorUnavailable = true;
+      }
+    }
+
+    function drawAnimalOverlay() {
+      const dpr = window.devicePixelRatio || 1;
+      const width = animalCanvas.width / dpr;
+      const height = animalCanvas.height / dpr;
+      const ctx = animalCanvas.getContext('2d');
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      let faceBox = null;
+
+      if (lastDetectedFace) {
+        faceBox = mapVideoFaceToCanvas(lastDetectedFace, width, height);
+      } else if (!detectorReady || detectorUnavailable) {
+        faceBox = getFallbackFaceBox(width, height);
+      }
+
+      if (!faceBox) return;
+
+      drawSelectedAnimal(ctx, faceBox);
+    }
+
+    function mapVideoFaceToCanvas(face, canvasWidth, canvasHeight) {
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+
+      if (!videoWidth || !videoHeight) return null;
+
+      const scale = Math.max(canvasWidth / videoWidth, canvasHeight / videoHeight);
+      const drawnWidth = videoWidth * scale;
+      const drawnHeight = videoHeight * scale;
+      const offsetX = (canvasWidth - drawnWidth) / 2;
+      const offsetY = (canvasHeight - drawnHeight) / 2;
+
+      const x = offsetX + face.x * scale;
+      const y = offsetY + face.y * scale;
+      const w = face.width * scale;
+      const h = face.height * scale;
+
+      return {
+        x: canvasWidth - (x + w),
+        y,
+        width: w,
+        height: h
+      };
+    }
+
+    function getFallbackFaceBox(width, height) {
+      const size = Math.min(width, height) * 0.36;
+
+      return {
+        x: (width - size) / 2,
+        y: height * 0.31,
+        width: size,
+        height: size * 1.12
+      };
+    }
+
+    function drawSelectedAnimal(ctx, faceBox) {
+      const cx = faceBox.x + faceBox.width / 2;
+      const cy = faceBox.y + faceBox.height / 2;
+      const faceWidth = Math.min(ctx.canvas.width, faceBox.width * 1.62);
+      const faceHeight = faceBox.height * 1.72;
+      const top = cy - faceHeight * 0.54;
+      const left = cx - faceWidth / 2;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 4;
+
+      if (selectedAnimal === 'tiger') {
+        drawTiger(ctx, left, top, faceWidth, faceHeight);
+      } else if (selectedAnimal === 'panda') {
+        drawPanda(ctx, left, top, faceWidth, faceHeight);
+      } else if (selectedAnimal === 'squirrel') {
+        drawSquirrel(ctx, left, top, faceWidth, faceHeight);
+      } else if (selectedAnimal === 'rabbit') {
+        drawRabbit(ctx, left, top, faceWidth, faceHeight);
+      } else {
+        drawLion(ctx, left, top, faceWidth, faceHeight);
+      }
+
+      ctx.restore();
+    }
+
+    function ellipse(ctx, x, y, w, h, fill, stroke, lineWidth) {
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+
+      if (stroke) {
+        ctx.lineWidth = lineWidth || 2;
+        ctx.strokeStyle = stroke;
+        ctx.stroke();
+      }
+    }
+
+    function circle(ctx, x, y, r, fill, stroke, lineWidth) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+
+      if (stroke) {
+        ctx.lineWidth = lineWidth || 2;
+        ctx.strokeStyle = stroke;
+        ctx.stroke();
+      }
+    }
+
+    function roundTriangle(ctx, points, fill) {
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i][0], points[i][1]);
+      }
+
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
+
+    function drawCommonSmile(ctx, cx, cy, w, h, color) {
+      ctx.strokeStyle = color || '#4b2e17';
+      ctx.lineWidth = Math.max(2.3, w * 0.026);
+      ctx.lineCap = 'round';
+
+      ctx.beginPath();
+      ctx.arc(cx - w * 0.08, cy + h * 0.1, w * 0.08, 0.18 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx + w * 0.08, cy + h * 0.1, w * 0.08, 0.15 * Math.PI, 0.82 * Math.PI);
+      ctx.stroke();
+    }
+
+    function drawEyesNose(ctx, cx, cy, w, h, eyeColor, noseColor) {
+      circle(ctx, cx - w * 0.18, cy - h * 0.08, w * 0.045, eyeColor || '#111827');
+      circle(ctx, cx + w * 0.18, cy - h * 0.08, w * 0.045, eyeColor || '#111827');
+      circle(ctx, cx - w * 0.165, cy - h * 0.095, w * 0.014, '#ffffff');
+      circle(ctx, cx + w * 0.165, cy - h * 0.095, w * 0.014, '#ffffff');
+
+      roundTriangle(ctx, [
+        [cx, cy + h * 0.02],
+        [cx - w * 0.055, cy + h * 0.08],
+        [cx + w * 0.055, cy + h * 0.08]
+      ], noseColor || '#111827');
+    }
+
+    function drawLion(ctx, x, y, w, h) {
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      for (let i = 0; i < 18; i++) {
+        const angle = (Math.PI * 2 / 18) * i;
+        const px = cx + Math.cos(angle) * w * 0.34;
+        const py = cy + Math.sin(angle) * h * 0.33;
+        circle(ctx, px, py, w * 0.115, '#9a5a22');
+      }
+
+      ellipse(ctx, x + w * 0.13, y + h * 0.08, w * 0.74, h * 0.78, '#d99a34', '#7c3f16', 2);
+      circle(ctx, cx - w * 0.25, y + h * 0.18, w * 0.12, '#d99a34', '#7c3f16', 2);
+      circle(ctx, cx + w * 0.25, y + h * 0.18, w * 0.12, '#d99a34', '#7c3f16', 2);
+      circle(ctx, cx - w * 0.25, y + h * 0.18, w * 0.06, '#f1c27d');
+      circle(ctx, cx + w * 0.25, y + h * 0.18, w * 0.06, '#f1c27d');
+
+      ellipse(ctx, cx - w * 0.18, cy + h * 0.06, w * 0.18, h * 0.16, '#f7d08a');
+      ellipse(ctx, cx, cy + h * 0.06, w * 0.18, h * 0.16, '#f7d08a');
+
+      drawEyesNose(ctx, cx, cy, w, h, '#111827', '#4b2e17');
+      drawCommonSmile(ctx, cx, cy, w, h, '#4b2e17');
+    }
+
+    function drawTiger(ctx, x, y, w, h) {
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      circle(ctx, cx - w * 0.27, y + h * 0.22, w * 0.12, '#f59e0b', '#7c2d12', 2);
+      circle(ctx, cx + w * 0.27, y + h * 0.22, w * 0.12, '#f59e0b', '#7c2d12', 2);
+      circle(ctx, cx - w * 0.27, y + h * 0.22, w * 0.055, '#fed7aa');
+      circle(ctx, cx + w * 0.27, y + h * 0.22, w * 0.055, '#fed7aa');
+
+      ellipse(ctx, x + w * 0.12, y + h * 0.12, w * 0.76, h * 0.72, '#f59e0b', '#7c2d12', 2);
+
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = Math.max(2, w * 0.03);
+      ctx.lineCap = 'round';
+
+      [
+        [cx - w * 0.18, y + h * 0.19, cx - w * 0.08, y + h * 0.36],
+        [cx, y + h * 0.15, cx, y + h * 0.32],
+        [cx + w * 0.18, y + h * 0.19, cx + w * 0.08, y + h * 0.36],
+        [x + w * 0.18, y + h * 0.35, x + w * 0.33, y + h * 0.4],
+        [x + w * 0.82, y + h * 0.35, x + w * 0.67, y + h * 0.4],
+        [x + w * 0.18, y + h * 0.52, x + w * 0.33, y + h * 0.5],
+        [x + w * 0.82, y + h * 0.52, x + w * 0.67, y + h * 0.5]
+      ].forEach((line) => {
+        ctx.beginPath();
+        ctx.moveTo(line[0], line[1]);
+        ctx.lineTo(line[2], line[3]);
+        ctx.stroke();
+      });
+
+      ellipse(ctx, cx - w * 0.18, cy + h * 0.08, w * 0.18, h * 0.15, '#fed7aa');
+      ellipse(ctx, cx, cy + h * 0.08, w * 0.18, h * 0.15, '#fed7aa');
+
+      drawEyesNose(ctx, cx, cy, w, h, '#111827', '#111827');
+      drawCommonSmile(ctx, cx, cy, w, h, '#111827');
+    }
+
+    function drawPanda(ctx, x, y, w, h) {
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      circle(ctx, cx - w * 0.29, y + h * 0.22, w * 0.14, '#111827');
+      circle(ctx, cx + w * 0.29, y + h * 0.22, w * 0.14, '#111827');
+
+      ellipse(ctx, x + w * 0.13, y + h * 0.12, w * 0.74, h * 0.72, '#f8fafc', '#111827', 2);
+      ellipse(ctx, cx - w * 0.18, cy - h * 0.08, w * 0.19, h * 0.15, '#111827');
+      ellipse(ctx, cx + w * 0.18, cy - h * 0.08, w * 0.19, h * 0.15, '#111827');
+
+      drawEyesNose(ctx, cx, cy, w, h, '#ffffff', '#111827');
+      ellipse(ctx, cx - w * 0.17, cy + h * 0.09, w * 0.18, h * 0.14, '#f1f5f9');
+      ellipse(ctx, cx, cy + h * 0.09, w * 0.18, h * 0.14, '#f1f5f9');
+      drawCommonSmile(ctx, cx, cy, w, h, '#111827');
+    }
+
+    function drawSquirrel(ctx, x, y, w, h) {
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      circle(ctx, cx - w * 0.26, y + h * 0.2, w * 0.12, '#92400e', '#5b2706', 2);
+      circle(ctx, cx + w * 0.26, y + h * 0.2, w * 0.12, '#92400e', '#5b2706', 2);
+      circle(ctx, cx - w * 0.26, y + h * 0.2, w * 0.055, '#fbbf24');
+      circle(ctx, cx + w * 0.26, y + h * 0.2, w * 0.055, '#fbbf24');
+
+      ellipse(ctx, x + w * 0.13, y + h * 0.12, w * 0.74, h * 0.72, '#b45309', '#5b2706', 2);
+      ellipse(ctx, cx - w * 0.15, cy + h * 0.1, w * 0.18, h * 0.15, '#fbbf24');
+      ellipse(ctx, cx + w * 0.15, cy + h * 0.1, w * 0.18, h * 0.15, '#fbbf24');
+
+      ctx.strokeStyle = '#5b2706';
+      ctx.lineWidth = Math.max(1.5, w * 0.015);
+
+      for (let side of [-1, 1]) {
+        for (let i = 0; i < 3; i++) {
+          const yy = cy + h * (0.02 + i * 0.055);
+          ctx.beginPath();
+          ctx.moveTo(cx + side * w * 0.09, yy);
+          ctx.lineTo(cx + side * w * 0.32, yy - h * 0.04);
+          ctx.stroke();
+        }
+      }
+
+      drawEyesNose(ctx, cx, cy, w, h, '#111827', '#4b2e17');
+      drawCommonSmile(ctx, cx, cy, w, h, '#4b2e17');
+    }
+
+    function drawRabbit(ctx, x, y, w, h) {
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      ellipse(ctx, cx - w * 0.2, y - h * 0.06, w * 0.17, h * 0.42, '#f8fafc', '#cbd5e1', 2);
+      ellipse(ctx, cx + w * 0.2, y - h * 0.06, w * 0.17, h * 0.42, '#f8fafc', '#cbd5e1', 2);
+      ellipse(ctx, cx - w * 0.2, y + h * 0.02, w * 0.08, h * 0.28, '#fecdd3');
+      ellipse(ctx, cx + w * 0.2, y + h * 0.02, w * 0.08, h * 0.28, '#fecdd3');
+
+      ellipse(ctx, x + w * 0.13, y + h * 0.16, w * 0.74, h * 0.7, '#f8fafc', '#cbd5e1', 2);
+      ellipse(ctx, cx - w * 0.16, cy + h * 0.12, w * 0.18, h * 0.14, '#fee2e2');
+      ellipse(ctx, cx + w * 0.16, cy + h * 0.12, w * 0.18, h * 0.14, '#fee2e2');
+
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = Math.max(1.5, w * 0.014);
+
+      for (let side of [-1, 1]) {
+        for (let i = 0; i < 3; i++) {
+          const yy = cy + h * (0.04 + i * 0.055);
+          ctx.beginPath();
+          ctx.moveTo(cx + side * w * 0.08, yy);
+          ctx.lineTo(cx + side * w * 0.31, yy - h * 0.045);
+          ctx.stroke();
+        }
+      }
+
+      drawEyesNose(ctx, cx, cy, w, h, '#111827', '#fb7185');
+      drawCommonSmile(ctx, cx, cy, w, h, '#64748b');
     }
   </script>
 </body>
