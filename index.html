@@ -1,4 +1,3 @@
-ㅈㅇㅈㅇㅈㅇ
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -6,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby-qBO65if93JlEHmbJWTjZCzokLdGLze38-Or_NN6A59wuUBdKslHFLEoAwFkbL3mA/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz_TAz3gqOT1GNDMdIrBlWjP_-Mk9Z4j55bbgVIVQeR4U5zsE1A4Z-__pkmzWUHpj9C/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -375,8 +374,8 @@
 
     const STORAGE_KEY = 'safetyHelmetFormCacheV2';
     const STORAGE_TTL = 24 * 60 * 60 * 1000;
-    const CAPTURE_MAX_SIDE = 480;
-    const CAPTURE_QUALITY = 0.58;
+    const CAPTURE_MAX_SIDE = 420;
+    const CAPTURE_QUALITY = 0.54;
     const POLL_DELAY = 1800;
     const POLL_MAX_COUNT = 85;
     const FACE_DETECTION_INTERVAL = 280;
@@ -621,16 +620,16 @@
       if (!box) return;
 
       const blurBox = makePrivacyFaceBox(box, outputWidth, outputHeight);
-      blurCanvasArea(ctx, captureCanvas, blurBox, 42);
+      blurCanvasArea(ctx, captureCanvas, blurBox, 50);
     }
 
     function getFallbackCaptureFaceBox(width, height) {
-      const w = width * 0.42;
-      const h = height * 0.38;
+      const w = width * 0.44;
+      const h = height * 0.50;
 
       return {
         x: (width - w) / 2,
-        y: height * 0.20,
+        y: height * 0.24,
         width: w,
         height: h
       };
@@ -638,9 +637,11 @@
 
     function makePrivacyFaceBox(box, limitWidth, limitHeight) {
       const cx = box.x + box.width / 2;
-      const cy = box.y + box.height / 2;
-      const width = Math.min(box.width * 1.12, limitWidth);
-      const height = Math.min(box.height * 1.04, limitHeight);
+      // 얼굴 인식 박스가 이마 쪽으로 잡히는 경우가 많아 중심을 살짝 아래로 내립니다.
+      const cy = box.y + box.height / 2 + box.height * 0.13;
+      // 원형에 가까웠던 블러를 세로로 긴 달걀형으로 변경합니다.
+      const width = Math.min(box.width * 1.18, limitWidth);
+      const height = Math.min(box.height * 1.42, limitHeight);
       const x = Math.max(0, Math.min(cx - width / 2, limitWidth - width));
       const y = Math.max(0, Math.min(cy - height / 2, limitHeight - height));
 
@@ -660,7 +661,7 @@
       ctx.filter = 'blur(' + blurAmount + 'px)';
       ctx.drawImage(tempCanvas, 0, 0);
       ctx.filter = 'none';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
       ctx.fill();
       ctx.restore();
     }
@@ -863,19 +864,19 @@
 
     function showError(message) {
       resultBox.className = 'resultBox ng';
-      resultSign.textContent = 'NG';
+      resultSign.textContent = '재검사';
       resultText.textContent = message;
-      helmetPill.textContent = '안전모 NG';
-      strapPill.textContent = '턱끈 NG';
+      helmetPill.textContent = '안전모 -';
+      strapPill.textContent = '턱끈 -';
       facePill.textContent = '감지 -';
       setStatus(message);
     }
 
     function cleanErrorMessage(text) {
       const msg = String(text || '').trim();
-      if (!msg) return '검사 결과를 받지 못했습니다. 다시 검사해 주세요.';
-      if (/AI|Gemini|JSON|파싱|HTTP|API|script|server|서버/i.test(msg)) {
-        return '검사 판독이 안정적이지 않습니다. 다시 검사해 주세요.';
+      if (!msg) return '검사를 완료하지 못했습니다. 다시 검사해 주세요.';
+      if (/AI|Gemini|JSON|파싱|HTTP|API|script|server|서버|결과/i.test(msg)) {
+        return '검사를 완료하지 못했습니다. 카메라 화면을 확인한 뒤 다시 검사해 주세요.';
       }
       return msg;
     }
@@ -989,7 +990,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.filter = 'blur(42px)';
+      ctx.filter = 'blur(50px)';
       ctx.translate(canvasWidth, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, cover.x, cover.y, cover.width, cover.height);
@@ -997,7 +998,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
       ctx.fill();
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.46)';
@@ -1048,12 +1049,12 @@
     }
 
     function getFallbackOverlayFaceBox(width, height) {
-      const w = width * 0.42;
-      const h = height * 0.38;
+      const w = width * 0.44;
+      const h = height * 0.50;
 
       return {
         x: (width - w) / 2,
-        y: height * 0.20,
+        y: height * 0.24,
         width: w,
         height: h
       };
