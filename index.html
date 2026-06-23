@@ -1,3 +1,4 @@
+ㅈㅇㅈㅇㅈㅇ
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -5,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwtP1mipRoB4IiAqqsWXhkgdZEgTVRrujnWqK_It2duJU8W4UWYtwJtUfvlpOms6BkE/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby-qBO65if93JlEHmbJWTjZCzokLdGLze38-Or_NN6A59wuUBdKslHFLEoAwFkbL3mA/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -147,20 +148,6 @@
       height: 100%;
       pointer-events: none;
       z-index: 3;
-    }
-
-    .guideOval {
-      position: absolute;
-      left: 50%;
-      top: 48%;
-      width: 58%;
-      height: 72%;
-      transform: translate(-50%, -50%);
-      border: 3px solid rgba(255, 255, 255, 0.48);
-      border-radius: 50%;
-      pointer-events: none;
-      box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.05);
-      z-index: 4;
     }
 
     .cameraHint {
@@ -343,8 +330,7 @@
         <video id="video" autoplay muted playsinline></video>
         <canvas id="faceBlurCanvas" class="faceBlurCanvas"></canvas>
         <div id="privacyBadge" class="privacyBadge" role="button" tabindex="0">얼굴 흐림 처리</div>
-        <div class="guideOval"></div>
-        <div class="cameraHint">안전모 전체와 턱끈이 보이게 화면 중앙에 맞춰주세요</div>
+        <div class="cameraHint">안전모 전체와 턱끈이 잘 보이면 바로 검사하세요</div>
       </div>
 
       <div class="btnRow">
@@ -389,8 +375,8 @@
 
     const STORAGE_KEY = 'safetyHelmetFormCacheV2';
     const STORAGE_TTL = 24 * 60 * 60 * 1000;
-    const CAPTURE_MAX_SIDE = 720;
-    const CAPTURE_QUALITY = 0.74;
+    const CAPTURE_MAX_SIDE = 480;
+    const CAPTURE_QUALITY = 0.58;
     const POLL_DELAY = 1800;
     const POLL_MAX_COUNT = 85;
     const FACE_DETECTION_INTERVAL = 280;
@@ -429,7 +415,7 @@
       startFaceBlurLoop();
       updateCameraButtonState();
       updateFaceBlurBadge();
-      setStatus('카메라를 켠 뒤 검사해 주세요.');
+      setStatus('카메라를 켠 뒤 안전모와 턱끈이 보이면 검사해 주세요.');
       startCamera(true);
     });
 
@@ -596,15 +582,19 @@
       const vw = video.videoWidth;
       const vh = video.videoHeight;
       const scale = Math.min(CAPTURE_MAX_SIDE / Math.max(vw, vh), 1);
-      const outputWidth = Math.max(320, Math.round(vw * scale));
-      const outputHeight = Math.max(320, Math.round(vh * scale));
+      const outputWidth = Math.max(240, Math.round(vw * scale));
+      const outputHeight = Math.max(240, Math.round(vh * scale));
 
       captureCanvas.width = outputWidth;
       captureCanvas.height = outputHeight;
 
       const ctx = captureCanvas.getContext('2d', { willReadFrequently: false });
       ctx.clearRect(0, 0, outputWidth, outputHeight);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.filter = 'brightness(1.04) contrast(1.08) saturate(1.03)';
       ctx.drawImage(video, 0, 0, outputWidth, outputHeight);
+      ctx.filter = 'none';
 
       if (faceBlurApplied) {
         applyFaceBlurToCapture(ctx, outputWidth, outputHeight, outputWidth / vw, outputHeight / vh);
@@ -631,16 +621,16 @@
       if (!box) return;
 
       const blurBox = makePrivacyFaceBox(box, outputWidth, outputHeight);
-      blurCanvasArea(ctx, captureCanvas, blurBox, 28);
+      blurCanvasArea(ctx, captureCanvas, blurBox, 42);
     }
 
     function getFallbackCaptureFaceBox(width, height) {
-      const w = width * 0.34;
-      const h = height * 0.34;
+      const w = width * 0.42;
+      const h = height * 0.38;
 
       return {
         x: (width - w) / 2,
-        y: height * 0.24,
+        y: height * 0.20,
         width: w,
         height: h
       };
@@ -648,16 +638,13 @@
 
     function makePrivacyFaceBox(box, limitWidth, limitHeight) {
       const cx = box.x + box.width / 2;
-      const cy = box.y + box.height * 0.48;
-      const width = box.width * 1.18;
-      const height = box.height * 0.76;
+      const cy = box.y + box.height / 2;
+      const width = Math.min(box.width * 1.12, limitWidth);
+      const height = Math.min(box.height * 1.04, limitHeight);
+      const x = Math.max(0, Math.min(cx - width / 2, limitWidth - width));
+      const y = Math.max(0, Math.min(cy - height / 2, limitHeight - height));
 
-      return {
-        x: Math.max(0, cx - width / 2),
-        y: Math.max(0, cy - height / 2),
-        width: Math.min(width, limitWidth),
-        height: Math.min(height, limitHeight)
-      };
+      return { x: x, y: y, width: width, height: height };
     }
 
     function blurCanvasArea(ctx, sourceCanvas, box, blurAmount) {
@@ -673,7 +660,7 @@
       ctx.filter = 'blur(' + blurAmount + 'px)';
       ctx.drawImage(tempCanvas, 0, 0);
       ctx.filter = 'none';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
       ctx.fill();
       ctx.restore();
     }
@@ -1002,7 +989,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.filter = 'blur(30px)';
+      ctx.filter = 'blur(42px)';
       ctx.translate(canvasWidth, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, cover.x, cover.y, cover.width, cover.height);
@@ -1010,7 +997,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
       ctx.fill();
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.46)';
@@ -1061,12 +1048,12 @@
     }
 
     function getFallbackOverlayFaceBox(width, height) {
-      const w = width * 0.34;
-      const h = height * 0.34;
+      const w = width * 0.42;
+      const h = height * 0.38;
 
       return {
         x: (width - w) / 2,
-        y: height * 0.24,
+        y: height * 0.20,
         width: w,
         height: h
       };
