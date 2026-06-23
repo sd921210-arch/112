@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwSDKWQV7LAza5KnG5zKNvSxoyjXarOrtlF6eIweHbP7FmIXxh1MKL5qh9AxScaw0xq/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzYs3HMn0sU6MEDk--Cukn1zPWVReT7hHF3qGxUf0Tm_douUBLYT6hS9Z6GN6g4Ycdi/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -23,8 +23,6 @@
       --ok-bg: #dcfce7;
       --ng: #dc2626;
       --ng-bg: #fee2e2;
-      --warn-bg: #fff7ed;
-      --warn-text: #9a3412;
     }
 
     * { box-sizing: border-box; }
@@ -135,21 +133,7 @@
       background: #0f172a;
     }
 
-    .guideOval {
-      position: absolute;
-      left: 50%;
-      top: 48%;
-      width: 58%;
-      height: 72%;
-      transform: translate(-50%, -50%);
-      border: 3px solid rgba(255, 255, 255, 0.55);
-      border-radius: 50%;
-      pointer-events: none;
-      box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.06);
-      z-index: 2;
-    }
-
-    .animalCanvas {
+    .faceBlurCanvas {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -158,32 +142,18 @@
       z-index: 3;
     }
 
-    .animalPicker {
+    .guideOval {
       position: absolute;
-      left: 10px;
-      right: 10px;
-      top: 10px;
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 6px;
+      left: 50%;
+      top: 48%;
+      width: 58%;
+      height: 72%;
+      transform: translate(-50%, -50%);
+      border: 3px solid rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.05);
       z-index: 4;
-    }
-
-    .animalBtn {
-      height: 36px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.55);
-      background: rgba(15, 23, 42, 0.55);
-      color: #fff;
-      font-size: 17px;
-      font-weight: 800;
-      backdrop-filter: blur(6px);
-      cursor: pointer;
-    }
-
-    .animalBtn.active {
-      background: rgba(37, 99, 235, 0.92);
-      border-color: rgba(255, 255, 255, 0.85);
     }
 
     .cameraHint {
@@ -194,11 +164,26 @@
       color: white;
       font-size: 12px;
       text-align: center;
-      background: rgba(15, 23, 42, 0.6);
+      background: rgba(15, 23, 42, 0.62);
       border-radius: 999px;
       padding: 8px 10px;
       backdrop-filter: blur(6px);
-      z-index: 4;
+      z-index: 5;
+    }
+
+    .privacyBadge {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      color: white;
+      font-size: 12px;
+      font-weight: 800;
+      background: rgba(15, 23, 42, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      border-radius: 999px;
+      padding: 7px 10px;
+      backdrop-filter: blur(6px);
+      z-index: 5;
     }
 
     .btnRow {
@@ -320,7 +305,7 @@
 <body>
   <div class="app">
     <h1 class="title">AI 안전모 검사</h1>
-    <div class="sub">얼굴, 안전모, 턱끈이 보이게 맞춘 뒤 검사하세요.</div>
+    <div class="sub">얼굴 부위는 흐림 처리하고, 안전모와 턱끈 착용 상태만 검사합니다.</div>
 
     <div class="card">
       <div class="field">
@@ -342,18 +327,10 @@
     <div class="card">
       <div class="cameraBox" id="cameraBox">
         <video id="video" autoplay muted playsinline></video>
-
-        <div class="animalPicker" aria-label="동물 얼굴 선택">
-          <button class="animalBtn active" type="button" data-animal="lion" title="사자">🦁</button>
-          <button class="animalBtn" type="button" data-animal="tiger" title="호랑이">🐯</button>
-          <button class="animalBtn" type="button" data-animal="panda" title="팬더">🐼</button>
-          <button class="animalBtn" type="button" data-animal="squirrel" title="다람쥐">🐿️</button>
-          <button class="animalBtn" type="button" data-animal="rabbit" title="토끼">🐰</button>
-        </div>
-
+        <canvas id="faceBlurCanvas" class="faceBlurCanvas"></canvas>
+        <div class="privacyBadge">얼굴 흐림 처리</div>
         <div class="guideOval"></div>
-        <canvas id="animalCanvas" class="animalCanvas"></canvas>
-        <div class="cameraHint">얼굴 정면 · 안전모 전체 · 턱끈이 보이게 맞춰주세요</div>
+        <div class="cameraHint">안전모 전체 · 턱끈이 보이게 맞춰주세요</div>
       </div>
 
       <div class="btnRow">
@@ -380,7 +357,7 @@
   <script>
     const video = document.getElementById('video');
     const captureCanvas = document.getElementById('captureCanvas');
-    const animalCanvas = document.getElementById('animalCanvas');
+    const faceBlurCanvas = document.getElementById('faceBlurCanvas');
     const cameraBox = document.getElementById('cameraBox');
     const cameraBtn = document.getElementById('cameraBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -394,40 +371,30 @@
     const nameInput = document.getElementById('nameInput');
     const siteInput = document.getElementById('siteInput');
     const consentInput = document.getElementById('consentInput');
-    const animalButtons = Array.from(document.querySelectorAll('.animalBtn'));
 
     const STORAGE_KEY = 'helmetSafetyInputs:v1';
     const STORAGE_TTL = 24 * 60 * 60 * 1000;
     const CAPTURE_SIZE = 224;
     const CAPTURE_QUALITY = 0.34;
+    const FACE_DETECTION_INTERVAL = 120;
 
     let stream = null;
     let isAnalyzing = false;
     let currentRequestId = '';
     let pollCount = 0;
     let pollTimer = null;
-    let selectedAnimal = 'lion';
     let faceDetector = null;
     let detectorReady = false;
     let detectorUnavailable = false;
     let lastDetectedFace = null;
     let lastDetectionAt = 0;
-    let overlayLoopStarted = false;
+    let blurLoopStarted = false;
 
     cameraBtn.addEventListener('click', () => startCamera(false));
     analyzeBtn.addEventListener('click', analyzeCurrentFrame);
-
     nameInput.addEventListener('input', saveSavedInputs);
     siteInput.addEventListener('input', saveSavedInputs);
-
-    animalButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        selectedAnimal = button.dataset.animal || 'lion';
-        animalButtons.forEach((item) => item.classList.toggle('active', item === button));
-      });
-    });
-
-    window.addEventListener('resize', resizeAnimalCanvas);
+    window.addEventListener('resize', resizeFaceBlurCanvas);
 
     window.addEventListener('load', () => {
       loadSavedInputs();
@@ -476,6 +443,8 @@
             maxDetectedFaces: 1
           });
           detectorReady = true;
+        } else {
+          detectorUnavailable = true;
         }
       } catch (err) {
         faceDetector = null;
@@ -512,8 +481,8 @@
 
         await video.play();
 
-        resizeAnimalCanvas();
-        startAnimalOverlayLoop();
+        resizeFaceBlurCanvas();
+        startFaceBlurLoop();
 
         analyzeBtn.disabled = false;
         cameraBtn.textContent = '카메라 실행중';
@@ -559,7 +528,6 @@
     function captureLowResJpeg() {
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-
       const cropSize = Math.min(vw, vh);
       const sx = Math.floor((vw - cropSize) / 2);
       const sy = Math.floor((vh - cropSize) / 2);
@@ -568,9 +536,59 @@
       captureCanvas.height = CAPTURE_SIZE;
 
       const ctx = captureCanvas.getContext('2d', { willReadFrequently: false });
+      ctx.clearRect(0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
       ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
 
+      applyFaceBlurToCapture(ctx, sx, sy, cropSize);
+
       return captureCanvas.toDataURL('image/jpeg', CAPTURE_QUALITY);
+    }
+
+    function applyFaceBlurToCapture(ctx, cropX, cropY, cropSize) {
+      let box = null;
+
+      if (lastDetectedFace) {
+        const face = readFaceRect(lastDetectedFace);
+        const scale = CAPTURE_SIZE / cropSize;
+
+        box = {
+          x: (face.x - cropX) * scale,
+          y: (face.y - cropY) * scale,
+          width: face.width * scale,
+          height: face.height * scale
+        };
+      } else if (detectorUnavailable) {
+        const size = CAPTURE_SIZE * 0.4;
+        box = {
+          x: (CAPTURE_SIZE - size) / 2,
+          y: CAPTURE_SIZE * 0.29,
+          width: size,
+          height: size * 1.2
+        };
+      }
+
+      if (!box) return;
+
+      const blurBox = expandBox(box, CAPTURE_SIZE, CAPTURE_SIZE, 1.22, 1.28, -0.02);
+      blurCanvasArea(ctx, captureCanvas, blurBox, 10);
+    }
+
+    function blurCanvasArea(ctx, sourceCanvas, box, blurAmount) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = sourceCanvas.width;
+      tempCanvas.height = sourceCanvas.height;
+
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(sourceCanvas, 0, 0);
+
+      ctx.save();
+      makeOvalClip(ctx, box);
+      ctx.filter = 'blur(' + blurAmount + 'px)';
+      ctx.drawImage(tempCanvas, 0, 0);
+      ctx.filter = 'none';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.fill();
+      ctx.restore();
     }
 
     function makeRequestId() {
@@ -606,7 +624,8 @@
           userAgent: navigator.userAgent,
           screen: `${window.innerWidth}x${window.innerHeight} / dpr:${window.devicePixelRatio || 1}`,
           pageUrl: location.href,
-          time: new Date().toISOString()
+          time: new Date().toISOString(),
+          facePrivacy: 'blurred'
         }
       };
 
@@ -756,7 +775,7 @@
       statusEl.textContent = message || '';
     }
 
-    function resizeAnimalCanvas() {
+    function resizeFaceBlurCanvas() {
       const rect = cameraBox.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
 
@@ -765,30 +784,30 @@
       const targetWidth = Math.round(rect.width * dpr);
       const targetHeight = Math.round(rect.height * dpr);
 
-      if (animalCanvas.width !== targetWidth || animalCanvas.height !== targetHeight) {
-        animalCanvas.width = targetWidth;
-        animalCanvas.height = targetHeight;
-        animalCanvas.style.width = rect.width + 'px';
-        animalCanvas.style.height = rect.height + 'px';
+      if (faceBlurCanvas.width !== targetWidth || faceBlurCanvas.height !== targetHeight) {
+        faceBlurCanvas.width = targetWidth;
+        faceBlurCanvas.height = targetHeight;
+        faceBlurCanvas.style.width = rect.width + 'px';
+        faceBlurCanvas.style.height = rect.height + 'px';
       }
     }
 
-    function startAnimalOverlayLoop() {
-      if (overlayLoopStarted) return;
+    function startFaceBlurLoop() {
+      if (blurLoopStarted) return;
 
-      overlayLoopStarted = true;
-      requestAnimationFrame(drawAnimalOverlayLoop);
+      blurLoopStarted = true;
+      requestAnimationFrame(drawFaceBlurLoop);
     }
 
-    async function drawAnimalOverlayLoop() {
-      resizeAnimalCanvas();
+    async function drawFaceBlurLoop() {
+      resizeFaceBlurCanvas();
 
       if (stream && video.videoWidth && video.videoHeight) {
         await updateFaceDetection();
-        drawAnimalOverlay();
+        drawFaceBlurOverlay();
       }
 
-      requestAnimationFrame(drawAnimalOverlayLoop);
+      requestAnimationFrame(drawFaceBlurLoop);
     }
 
     async function updateFaceDetection() {
@@ -798,7 +817,7 @@
         return;
       }
 
-      if (now - lastDetectionAt < 120) {
+      if (now - lastDetectionAt < FACE_DETECTION_INTERVAL) {
         return;
       }
 
@@ -813,11 +832,11 @@
       }
     }
 
-    function drawAnimalOverlay() {
+    function drawFaceBlurOverlay() {
       const dpr = window.devicePixelRatio || 1;
-      const width = animalCanvas.width / dpr;
-      const height = animalCanvas.height / dpr;
-      const ctx = animalCanvas.getContext('2d');
+      const width = faceBlurCanvas.width / dpr;
+      const height = faceBlurCanvas.height / dpr;
+      const ctx = faceBlurCanvas.getContext('2d');
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
@@ -826,29 +845,59 @@
 
       if (lastDetectedFace) {
         faceBox = mapVideoFaceToCanvas(lastDetectedFace, width, height);
-      } else if (!detectorReady || detectorUnavailable) {
+      } else if (detectorUnavailable) {
         faceBox = getFallbackFaceBox(width, height);
       }
 
       if (!faceBox) return;
 
-      drawSelectedAnimal(ctx, faceBox);
+      const blurBox = expandBox(faceBox, width, height, 1.24, 1.32, -0.02);
+      drawBlurredVideoPatch(ctx, blurBox, width, height);
     }
 
-    function mapVideoFaceToCanvas(face, canvasWidth, canvasHeight) {
+    function drawBlurredVideoPatch(ctx, box, canvasWidth, canvasHeight) {
+      const cover = getVideoCoverRect(canvasWidth, canvasHeight);
+
+      ctx.save();
+      makeOvalClip(ctx, box);
+      ctx.filter = 'blur(16px)';
+      ctx.translate(canvasWidth, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, cover.x, cover.y, cover.width, cover.height);
+      ctx.restore();
+
+      ctx.save();
+      makeOvalClip(ctx, box);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function getVideoCoverRect(canvasWidth, canvasHeight) {
       const videoWidth = video.videoWidth;
       const videoHeight = video.videoHeight;
-
-      if (!videoWidth || !videoHeight) return null;
-
       const scale = Math.max(canvasWidth / videoWidth, canvasHeight / videoHeight);
-      const drawnWidth = videoWidth * scale;
-      const drawnHeight = videoHeight * scale;
-      const offsetX = (canvasWidth - drawnWidth) / 2;
-      const offsetY = (canvasHeight - drawnHeight) / 2;
+      const width = videoWidth * scale;
+      const height = videoHeight * scale;
 
-      const x = offsetX + face.x * scale;
-      const y = offsetY + face.y * scale;
+      return {
+        x: (canvasWidth - width) / 2,
+        y: (canvasHeight - height) / 2,
+        width,
+        height
+      };
+    }
+
+    function mapVideoFaceToCanvas(faceRect, canvasWidth, canvasHeight) {
+      const face = readFaceRect(faceRect);
+      const cover = getVideoCoverRect(canvasWidth, canvasHeight);
+      const scale = cover.width / video.videoWidth;
+
+      const x = cover.x + face.x * scale;
+      const y = cover.y + face.y * scale;
       const w = face.width * scale;
       const h = face.height * scale;
 
@@ -860,247 +909,52 @@
       };
     }
 
-    function getFallbackFaceBox(width, height) {
-      const size = Math.min(width, height) * 0.36;
-
+    function readFaceRect(faceRect) {
       return {
-        x: (width - size) / 2,
-        y: height * 0.31,
-        width: size,
-        height: size * 1.12
+        x: typeof faceRect.x === 'number' ? faceRect.x : (faceRect.left || 0),
+        y: typeof faceRect.y === 'number' ? faceRect.y : (faceRect.top || 0),
+        width: faceRect.width || 0,
+        height: faceRect.height || 0
       };
     }
 
-    function drawSelectedAnimal(ctx, faceBox) {
-      const cx = faceBox.x + faceBox.width / 2;
-      const cy = faceBox.y + faceBox.height / 2;
-      const faceWidth = Math.min(ctx.canvas.width, faceBox.width * 1.62);
-      const faceHeight = faceBox.height * 1.72;
-      const top = cy - faceHeight * 0.54;
-      const left = cx - faceWidth / 2;
+    function getFallbackFaceBox(width, height) {
+      const size = Math.min(width, height) * 0.38;
 
-      ctx.save();
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
-      ctx.shadowBlur = 14;
-      ctx.shadowOffsetY = 4;
-
-      if (selectedAnimal === 'tiger') {
-        drawTiger(ctx, left, top, faceWidth, faceHeight);
-      } else if (selectedAnimal === 'panda') {
-        drawPanda(ctx, left, top, faceWidth, faceHeight);
-      } else if (selectedAnimal === 'squirrel') {
-        drawSquirrel(ctx, left, top, faceWidth, faceHeight);
-      } else if (selectedAnimal === 'rabbit') {
-        drawRabbit(ctx, left, top, faceWidth, faceHeight);
-      } else {
-        drawLion(ctx, left, top, faceWidth, faceHeight);
-      }
-
-      ctx.restore();
+      return {
+        x: (width - size) / 2,
+        y: height * 0.29,
+        width: size,
+        height: size * 1.2
+      };
     }
 
-    function ellipse(ctx, x, y, w, h, fill, stroke, lineWidth) {
+    function expandBox(box, limitWidth, limitHeight, widthScale, heightScale, yOffsetRatio) {
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2 + box.height * (yOffsetRatio || 0);
+      const width = box.width * widthScale;
+      const height = box.height * heightScale;
+
+      return {
+        x: Math.max(0, cx - width / 2),
+        y: Math.max(0, cy - height / 2),
+        width: Math.min(width, limitWidth),
+        height: Math.min(height, limitHeight)
+      };
+    }
+
+    function makeOvalClip(ctx, box) {
       ctx.beginPath();
-      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-      ctx.fillStyle = fill;
-      ctx.fill();
-
-      if (stroke) {
-        ctx.lineWidth = lineWidth || 2;
-        ctx.strokeStyle = stroke;
-        ctx.stroke();
-      }
-    }
-
-    function circle(ctx, x, y, r, fill, stroke, lineWidth) {
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = fill;
-      ctx.fill();
-
-      if (stroke) {
-        ctx.lineWidth = lineWidth || 2;
-        ctx.strokeStyle = stroke;
-        ctx.stroke();
-      }
-    }
-
-    function roundTriangle(ctx, points, fill) {
-      ctx.beginPath();
-      ctx.moveTo(points[0][0], points[0][1]);
-
-      for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i][0], points[i][1]);
-      }
-
-      ctx.closePath();
-      ctx.fillStyle = fill;
-      ctx.fill();
-    }
-
-    function drawCommonSmile(ctx, cx, cy, w, h, color) {
-      ctx.strokeStyle = color || '#4b2e17';
-      ctx.lineWidth = Math.max(2.3, w * 0.026);
-      ctx.lineCap = 'round';
-
-      ctx.beginPath();
-      ctx.arc(cx - w * 0.08, cy + h * 0.1, w * 0.08, 0.18 * Math.PI, 0.85 * Math.PI);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(cx + w * 0.08, cy + h * 0.1, w * 0.08, 0.15 * Math.PI, 0.82 * Math.PI);
-      ctx.stroke();
-    }
-
-    function drawEyesNose(ctx, cx, cy, w, h, eyeColor, noseColor) {
-      circle(ctx, cx - w * 0.18, cy - h * 0.08, w * 0.045, eyeColor || '#111827');
-      circle(ctx, cx + w * 0.18, cy - h * 0.08, w * 0.045, eyeColor || '#111827');
-      circle(ctx, cx - w * 0.165, cy - h * 0.095, w * 0.014, '#ffffff');
-      circle(ctx, cx + w * 0.165, cy - h * 0.095, w * 0.014, '#ffffff');
-
-      roundTriangle(ctx, [
-        [cx, cy + h * 0.02],
-        [cx - w * 0.055, cy + h * 0.08],
-        [cx + w * 0.055, cy + h * 0.08]
-      ], noseColor || '#111827');
-    }
-
-    function drawLion(ctx, x, y, w, h) {
-      const cx = x + w / 2;
-      const cy = y + h / 2;
-
-      for (let i = 0; i < 18; i++) {
-        const angle = (Math.PI * 2 / 18) * i;
-        const px = cx + Math.cos(angle) * w * 0.34;
-        const py = cy + Math.sin(angle) * h * 0.33;
-        circle(ctx, px, py, w * 0.115, '#9a5a22');
-      }
-
-      ellipse(ctx, x + w * 0.13, y + h * 0.08, w * 0.74, h * 0.78, '#d99a34', '#7c3f16', 2);
-      circle(ctx, cx - w * 0.25, y + h * 0.18, w * 0.12, '#d99a34', '#7c3f16', 2);
-      circle(ctx, cx + w * 0.25, y + h * 0.18, w * 0.12, '#d99a34', '#7c3f16', 2);
-      circle(ctx, cx - w * 0.25, y + h * 0.18, w * 0.06, '#f1c27d');
-      circle(ctx, cx + w * 0.25, y + h * 0.18, w * 0.06, '#f1c27d');
-
-      ellipse(ctx, cx - w * 0.18, cy + h * 0.06, w * 0.18, h * 0.16, '#f7d08a');
-      ellipse(ctx, cx, cy + h * 0.06, w * 0.18, h * 0.16, '#f7d08a');
-
-      drawEyesNose(ctx, cx, cy, w, h, '#111827', '#4b2e17');
-      drawCommonSmile(ctx, cx, cy, w, h, '#4b2e17');
-    }
-
-    function drawTiger(ctx, x, y, w, h) {
-      const cx = x + w / 2;
-      const cy = y + h / 2;
-
-      circle(ctx, cx - w * 0.27, y + h * 0.22, w * 0.12, '#f59e0b', '#7c2d12', 2);
-      circle(ctx, cx + w * 0.27, y + h * 0.22, w * 0.12, '#f59e0b', '#7c2d12', 2);
-      circle(ctx, cx - w * 0.27, y + h * 0.22, w * 0.055, '#fed7aa');
-      circle(ctx, cx + w * 0.27, y + h * 0.22, w * 0.055, '#fed7aa');
-
-      ellipse(ctx, x + w * 0.12, y + h * 0.12, w * 0.76, h * 0.72, '#f59e0b', '#7c2d12', 2);
-
-      ctx.strokeStyle = '#111827';
-      ctx.lineWidth = Math.max(2, w * 0.03);
-      ctx.lineCap = 'round';
-
-      [
-        [cx - w * 0.18, y + h * 0.19, cx - w * 0.08, y + h * 0.36],
-        [cx, y + h * 0.15, cx, y + h * 0.32],
-        [cx + w * 0.18, y + h * 0.19, cx + w * 0.08, y + h * 0.36],
-        [x + w * 0.18, y + h * 0.35, x + w * 0.33, y + h * 0.4],
-        [x + w * 0.82, y + h * 0.35, x + w * 0.67, y + h * 0.4],
-        [x + w * 0.18, y + h * 0.52, x + w * 0.33, y + h * 0.5],
-        [x + w * 0.82, y + h * 0.52, x + w * 0.67, y + h * 0.5]
-      ].forEach((line) => {
-        ctx.beginPath();
-        ctx.moveTo(line[0], line[1]);
-        ctx.lineTo(line[2], line[3]);
-        ctx.stroke();
-      });
-
-      ellipse(ctx, cx - w * 0.18, cy + h * 0.08, w * 0.18, h * 0.15, '#fed7aa');
-      ellipse(ctx, cx, cy + h * 0.08, w * 0.18, h * 0.15, '#fed7aa');
-
-      drawEyesNose(ctx, cx, cy, w, h, '#111827', '#111827');
-      drawCommonSmile(ctx, cx, cy, w, h, '#111827');
-    }
-
-    function drawPanda(ctx, x, y, w, h) {
-      const cx = x + w / 2;
-      const cy = y + h / 2;
-
-      circle(ctx, cx - w * 0.29, y + h * 0.22, w * 0.14, '#111827');
-      circle(ctx, cx + w * 0.29, y + h * 0.22, w * 0.14, '#111827');
-
-      ellipse(ctx, x + w * 0.13, y + h * 0.12, w * 0.74, h * 0.72, '#f8fafc', '#111827', 2);
-      ellipse(ctx, cx - w * 0.18, cy - h * 0.08, w * 0.19, h * 0.15, '#111827');
-      ellipse(ctx, cx + w * 0.18, cy - h * 0.08, w * 0.19, h * 0.15, '#111827');
-
-      drawEyesNose(ctx, cx, cy, w, h, '#ffffff', '#111827');
-      ellipse(ctx, cx - w * 0.17, cy + h * 0.09, w * 0.18, h * 0.14, '#f1f5f9');
-      ellipse(ctx, cx, cy + h * 0.09, w * 0.18, h * 0.14, '#f1f5f9');
-      drawCommonSmile(ctx, cx, cy, w, h, '#111827');
-    }
-
-    function drawSquirrel(ctx, x, y, w, h) {
-      const cx = x + w / 2;
-      const cy = y + h / 2;
-
-      circle(ctx, cx - w * 0.26, y + h * 0.2, w * 0.12, '#92400e', '#5b2706', 2);
-      circle(ctx, cx + w * 0.26, y + h * 0.2, w * 0.12, '#92400e', '#5b2706', 2);
-      circle(ctx, cx - w * 0.26, y + h * 0.2, w * 0.055, '#fbbf24');
-      circle(ctx, cx + w * 0.26, y + h * 0.2, w * 0.055, '#fbbf24');
-
-      ellipse(ctx, x + w * 0.13, y + h * 0.12, w * 0.74, h * 0.72, '#b45309', '#5b2706', 2);
-      ellipse(ctx, cx - w * 0.15, cy + h * 0.1, w * 0.18, h * 0.15, '#fbbf24');
-      ellipse(ctx, cx + w * 0.15, cy + h * 0.1, w * 0.18, h * 0.15, '#fbbf24');
-
-      ctx.strokeStyle = '#5b2706';
-      ctx.lineWidth = Math.max(1.5, w * 0.015);
-
-      for (let side of [-1, 1]) {
-        for (let i = 0; i < 3; i++) {
-          const yy = cy + h * (0.02 + i * 0.055);
-          ctx.beginPath();
-          ctx.moveTo(cx + side * w * 0.09, yy);
-          ctx.lineTo(cx + side * w * 0.32, yy - h * 0.04);
-          ctx.stroke();
-        }
-      }
-
-      drawEyesNose(ctx, cx, cy, w, h, '#111827', '#4b2e17');
-      drawCommonSmile(ctx, cx, cy, w, h, '#4b2e17');
-    }
-
-    function drawRabbit(ctx, x, y, w, h) {
-      const cx = x + w / 2;
-      const cy = y + h / 2;
-
-      ellipse(ctx, cx - w * 0.2, y - h * 0.06, w * 0.17, h * 0.42, '#f8fafc', '#cbd5e1', 2);
-      ellipse(ctx, cx + w * 0.2, y - h * 0.06, w * 0.17, h * 0.42, '#f8fafc', '#cbd5e1', 2);
-      ellipse(ctx, cx - w * 0.2, y + h * 0.02, w * 0.08, h * 0.28, '#fecdd3');
-      ellipse(ctx, cx + w * 0.2, y + h * 0.02, w * 0.08, h * 0.28, '#fecdd3');
-
-      ellipse(ctx, x + w * 0.13, y + h * 0.16, w * 0.74, h * 0.7, '#f8fafc', '#cbd5e1', 2);
-      ellipse(ctx, cx - w * 0.16, cy + h * 0.12, w * 0.18, h * 0.14, '#fee2e2');
-      ellipse(ctx, cx + w * 0.16, cy + h * 0.12, w * 0.18, h * 0.14, '#fee2e2');
-
-      ctx.strokeStyle = '#64748b';
-      ctx.lineWidth = Math.max(1.5, w * 0.014);
-
-      for (let side of [-1, 1]) {
-        for (let i = 0; i < 3; i++) {
-          const yy = cy + h * (0.04 + i * 0.055);
-          ctx.beginPath();
-          ctx.moveTo(cx + side * w * 0.08, yy);
-          ctx.lineTo(cx + side * w * 0.31, yy - h * 0.045);
-          ctx.stroke();
-        }
-      }
-
-      drawEyesNose(ctx, cx, cy, w, h, '#111827', '#fb7185');
-      drawCommonSmile(ctx, cx, cy, w, h, '#64748b');
+      ctx.ellipse(
+        box.x + box.width / 2,
+        box.y + box.height / 2,
+        box.width / 2,
+        box.height / 2,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.clip();
     }
   </script>
 </body>
