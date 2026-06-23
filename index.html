@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyIiD_UKjwGssNxf090ZjnNqv46VhVXcE0D6fOj9ykCnO86rYMns_g-jmMaYnlCr63g/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxS_PhtkF4s0ejaF2S2megrl0DlHf53VP207_wAg5vhXqM8lnKLZA-hL0srapUnHwNv/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -740,7 +740,7 @@
 
       resultBox.className = 'resultBox ' + (isOk ? 'ok' : 'ng');
       resultSign.textContent = isOk ? 'OK' : 'NG';
-      resultText.textContent = (safe.reason || '') + '\n' + (safe.action || '');
+      resultText.textContent = safe.reason || '';
       helmetPill.textContent = '안전모 ' + safe.hardhat;
       strapPill.textContent = '턱끈 ' + safe.chinstrap;
       facePill.textContent = '감지 ' + (safe.personVisible ? 'Y' : 'N');
@@ -758,9 +758,17 @@
         hardhat: hardhat,
         chinstrap: chinstrap,
         personVisible: personVisible,
-        reason: result.reason || (overall === 'OK' ? '안전모와 턱끈 착용이 확인되었습니다.' : '안전모와 턱끈 착용 상태를 확인해 주세요.'),
-        action: result.action || (overall === 'OK' ? '출입 가능합니다.' : '안전모와 턱끈을 착용한 뒤 다시 검사해 주세요.')
+        reason: result.reason || makeClientReason(overall, hardhat, chinstrap, personVisible)
       };
+    }
+
+    function makeClientReason(overall, hardhat, chinstrap, personVisible) {
+      if (overall === 'OK') return '안전모와 턱끈 착용이 확인되었습니다.';
+      if (!personVisible) return '사람이 화면에 잘 보이게 다시 맞춰 주세요.';
+      if (hardhat === 'NG' && chinstrap === 'NG') return '안전모와 턱끈 착용을 확인해 주세요.';
+      if (hardhat === 'NG') return '안전모 착용을 확인해 주세요.';
+      if (chinstrap === 'NG') return '턱끈 착용을 확인해 주세요.';
+      return '안전보호구 착용 상태를 확인해 주세요.';
     }
 
     function showError(message) {
@@ -991,12 +999,22 @@
       const w = box.width;
       const h = box.height;
 
+      const topY = y + h * 0.08;
+      const topLeft = x + w * 0.27;
+      const topRight = x + w * 0.73;
+      const rightMidX = x + w * 0.94;
+      const leftMidX = x + w * 0.06;
+      const midY = y + h * 0.47;
+      const bottomX = x + w * 0.50;
+      const bottomY = y + h * 0.98;
+
       ctx.beginPath();
-      if (ctx.ellipse) {
-        ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-      } else {
-        ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
-      }
+      ctx.moveTo(topLeft, topY);
+      ctx.lineTo(topRight, topY);
+      ctx.bezierCurveTo(x + w * 0.90, y + h * 0.10, x + w * 0.99, y + h * 0.30, rightMidX, midY);
+      ctx.bezierCurveTo(x + w * 0.88, y + h * 0.78, x + w * 0.70, y + h * 0.98, bottomX, bottomY);
+      ctx.bezierCurveTo(x + w * 0.30, y + h * 0.98, x + w * 0.12, y + h * 0.78, leftMidX, midY);
+      ctx.bezierCurveTo(x + w * 0.01, y + h * 0.30, x + w * 0.10, y + h * 0.10, topLeft, topY);
       ctx.closePath();
       ctx.clip();
     }
