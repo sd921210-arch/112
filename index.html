@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxMKSTnXIuqrV_NCeD_cq3tCD-l7DBFJc-tV1r_-AXB8x-vzUg10UUqBJqsAUrlLeac/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbybGkSQq3EKv_Doiihpxk-BS_v9MdVfnkmem1RtFHgF028mvBWNC4R5bE0eILeq5wmB/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -184,6 +184,13 @@
       padding: 7px 10px;
       backdrop-filter: blur(6px);
       z-index: 5;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .privacyBadge.off {
+      background: rgba(220, 38, 38, 0.78);
     }
 
     .btnRow {
@@ -328,13 +335,13 @@
       <div class="cameraBox" id="cameraBox">
         <video id="video" autoplay muted playsinline></video>
         <canvas id="faceBlurCanvas" class="faceBlurCanvas"></canvas>
-        <div class="privacyBadge">얼굴 흐림 처리</div>
+        <div id="privacyBadge" class="privacyBadge" role="button" tabindex="0">얼굴 흐림 처리</div>
         <div class="guideOval"></div>
         <div class="cameraHint">안전모 전체 · 턱끈이 보이게 맞춰주세요</div>
       </div>
 
       <div class="btnRow">
-        <button id="cameraBtn" class="btnSecondary" type="button">카메라 시작</button>
+        <button id="cameraBtn" class="btnSecondary" type="button">카메라 켜기</button>
         <button id="analyzeBtn" class="btnPrimary" type="button" disabled>검사</button>
       </div>
 
@@ -358,6 +365,7 @@
     const video = document.getElementById('video');
     const captureCanvas = document.getElementById('captureCanvas');
     const faceBlurCanvas = document.getElementById('faceBlurCanvas');
+    const privacyBadge = document.getElementById('privacyBadge');
     const cameraBox = document.getElementById('cameraBox');
     const cameraBtn = document.getElementById('cameraBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -389,9 +397,17 @@
     let lastDetectedFace = null;
     let lastDetectionAt = 0;
     let blurLoopStarted = false;
+    let faceBlurApplied = true;
 
-    cameraBtn.addEventListener('click', () => startCamera(false));
+    cameraBtn.addEventListener('click', toggleCamera);
     analyzeBtn.addEventListener('click', analyzeCurrentFrame);
+    privacyBadge.addEventListener('click', toggleFaceBlur);
+    privacyBadge.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleFaceBlur();
+      }
+    });
     nameInput.addEventListener('input', saveSavedInputs);
     siteInput.addEventListener('input', saveSavedInputs);
     window.addEventListener('resize', resizeFaceBlurCanvas);
@@ -399,6 +415,8 @@
     window.addEventListener('load', () => {
       loadSavedInputs();
       initFaceDetector();
+      updateFaceBlurBadge();
+      updateCameraButtonState();
       setStatus('카메라를 허용해 주세요.');
       startCamera(true);
     });
@@ -452,16 +470,31 @@
       }
     }
 
+    async function toggleCamera() {
+      if (isAnalyzing) return;
+
+      if (stream) {
+        stopCamera();
+      } else {
+        await startCamera(false);
+      }
+    }
+
     async function startCamera(silent) {
-      if (stream) return;
+      if (stream) {
+        updateCameraButtonState();
+        return;
+      }
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setStatus('카메라 기능을 지원하는 브라우저로 열어주세요.');
+        updateCameraButtonState();
         return;
       }
 
       try {
         setStatus('카메라 준비 중');
+        cameraBtn.disabled = true;
 
         const constraints = {
           audio: false,
@@ -485,19 +518,62 @@
         startFaceBlurLoop();
 
         analyzeBtn.disabled = false;
-        cameraBtn.textContent = '카메라 실행중';
-        cameraBtn.disabled = true;
+        updateCameraButtonState();
         setStatus('검사 준비 완료');
       } catch (err) {
         stream = null;
+        video.srcObject = null;
         analyzeBtn.disabled = true;
+        updateCameraButtonState();
 
         if (!silent) {
           setStatus(getCameraErrorMessage(err));
         } else {
-          setStatus('카메라 시작 버튼을 눌러주세요.');
+          setStatus('카메라 켜기를 눌러주세요.');
         }
       }
+    }
+
+    function stopCamera() {
+      if (!stream) {
+        updateCameraButtonState();
+        return;
+      }
+
+      try {
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (err) {}
+
+      stream = null;
+      video.pause();
+      video.srcObject = null;
+      lastDetectedFace = null;
+      clearFaceBlurCanvas();
+      analyzeBtn.disabled = true;
+      updateCameraButtonState();
+      setStatus('카메라 꺼짐');
+    }
+
+    function pauseCameraForAnalysis() {
+      if (!stream) return;
+
+      try {
+        video.pause();
+      } catch (err) {}
+    }
+
+    async function resumeCameraAfterAnalysis() {
+      if (!stream) return;
+
+      try {
+        await video.play();
+      } catch (err) {}
+    }
+
+    function updateCameraButtonState() {
+      cameraBtn.textContent = stream ? '카메라 끄기' : '카메라 켜기';
+      cameraBtn.disabled = isAnalyzing;
+      analyzeBtn.disabled = isAnalyzing || !stream || !video.videoWidth || !video.videoHeight;
     }
 
     function getCameraErrorMessage(err) {
@@ -539,7 +615,9 @@
       ctx.clearRect(0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
       ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
 
-      applyFaceBlurToCapture(ctx, sx, sy, cropSize);
+      if (faceBlurApplied) {
+        applyFaceBlurToCapture(ctx, sx, sy, cropSize);
+      }
 
       return captureCanvas.toDataURL('image/jpeg', CAPTURE_QUALITY);
     }
@@ -557,7 +635,7 @@
           width: face.width * scale,
           height: face.height * scale
         };
-      } else if (detectorUnavailable) {
+      } else {
         const size = CAPTURE_SIZE * 0.4;
         box = {
           x: (CAPTURE_SIZE - size) / 2,
@@ -619,18 +697,20 @@
         name: form.name,
         siteName: form.siteName,
         consent: form.consent,
+        faceBlurApplied: faceBlurApplied,
         imageDataUrl,
         clientInfo: {
           userAgent: navigator.userAgent,
           screen: `${window.innerWidth}x${window.innerHeight} / dpr:${window.devicePixelRatio || 1}`,
           pageUrl: location.href,
           time: new Date().toISOString(),
-          facePrivacy: 'blurred'
+          facePrivacy: faceBlurApplied ? 'blurred' : 'not_applied'
         }
       };
 
       isAnalyzing = true;
-      analyzeBtn.disabled = true;
+      pauseCameraForAnalysis();
+      setControlsForAnalysis(true);
       analyzeBtn.innerHTML = '<span class="spinner"></span>검사 중';
       clearResult();
       setStatus('검사 중');
@@ -721,21 +801,24 @@
       }, 10000);
     }
 
-    function finishAsSuccess(data) {
+    async function finishAsSuccess(data) {
       clearTimeout(pollTimer);
-      isAnalyzing = false;
-      analyzeBtn.disabled = false;
-      analyzeBtn.textContent = '검사';
-
       showResult(data.result);
+      await resumeCameraAfterAnalysis();
+      isAnalyzing = false;
+      analyzeBtn.textContent = '검사';
+      setControlsForAnalysis(false);
+      updateCameraButtonState();
     }
 
-    function finishAsError(message) {
+    async function finishAsError(message) {
       clearTimeout(pollTimer);
-      isAnalyzing = false;
-      analyzeBtn.disabled = false;
-      analyzeBtn.textContent = '검사';
       showError(message);
+      await resumeCameraAfterAnalysis();
+      isAnalyzing = false;
+      analyzeBtn.textContent = '검사';
+      setControlsForAnalysis(false);
+      updateCameraButtonState();
     }
 
     function showResult(result) {
@@ -773,6 +856,38 @@
 
     function setStatus(message) {
       statusEl.textContent = message || '';
+    }
+
+    function setControlsForAnalysis(disabled) {
+      cameraBtn.disabled = disabled;
+      analyzeBtn.disabled = disabled;
+      nameInput.disabled = disabled;
+      siteInput.disabled = disabled;
+      consentInput.disabled = disabled;
+      privacyBadge.style.pointerEvents = disabled ? 'none' : 'auto';
+      privacyBadge.style.opacity = disabled ? '0.65' : '1';
+    }
+
+    function toggleFaceBlur() {
+      if (isAnalyzing) return;
+
+      faceBlurApplied = !faceBlurApplied;
+      updateFaceBlurBadge();
+
+      if (!faceBlurApplied) {
+        clearFaceBlurCanvas();
+      }
+    }
+
+    function updateFaceBlurBadge() {
+      privacyBadge.textContent = faceBlurApplied ? '얼굴 흐림 처리' : '얼굴 흐림 미적용';
+      privacyBadge.classList.toggle('off', !faceBlurApplied);
+    }
+
+    function clearFaceBlurCanvas() {
+      const ctx = faceBlurCanvas.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, faceBlurCanvas.width, faceBlurCanvas.height);
     }
 
     function resizeFaceBlurCanvas() {
@@ -841,11 +956,13 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
 
+      if (!faceBlurApplied) return;
+
       let faceBox = null;
 
       if (lastDetectedFace) {
         faceBox = mapVideoFaceToCanvas(lastDetectedFace, width, height);
-      } else if (detectorUnavailable) {
+      } else {
         faceBox = getFallbackFaceBox(width, height);
       }
 
