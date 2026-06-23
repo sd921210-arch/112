@@ -1,5 +1,3 @@
-ㅇㄹㅇㄹㅇㅁㅁㅁㅁ
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -7,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxNDinWrwxBg-YhOMe8c4Ggv_5MuMngd9yixB9uisleiKBJBkgOi65ct6pl2n8SseSH/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwmQ7W2Ne4ov2L0hPot2K-gEXjI6YujGwtAGoSlwxPCy2uIsevgwZ8yBYsCstHE7nfm/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -93,11 +91,6 @@
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
-    input:disabled {
-      opacity: 0.7;
-      background: #f8fafc;
-    }
-
     .field { margin-bottom: 12px; }
 
     .agree {
@@ -148,7 +141,28 @@
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 3;
+    }
+
+    .privacyBadge {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      background: rgba(15, 23, 42, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      user-select: none;
+      backdrop-filter: blur(6px);
+      z-index: 2;
+    }
+
+    .privacyBadge.off {
+      background: rgba(220, 38, 38, 0.78);
     }
 
     .cameraHint {
@@ -159,33 +173,10 @@
       color: white;
       font-size: 12px;
       text-align: center;
-      background: rgba(15, 23, 42, 0.62);
+      background: rgba(15, 23, 42, 0.6);
       border-radius: 999px;
       padding: 8px 10px;
       backdrop-filter: blur(6px);
-      z-index: 5;
-    }
-
-    .privacyBadge {
-      position: absolute;
-      left: 12px;
-      top: 12px;
-      color: white;
-      font-size: 12px;
-      font-weight: 800;
-      background: rgba(15, 23, 42, 0.68);
-      border: 1px solid rgba(255, 255, 255, 0.32);
-      border-radius: 999px;
-      padding: 7px 10px;
-      backdrop-filter: blur(6px);
-      z-index: 5;
-      cursor: pointer;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .privacyBadge.off {
-      background: rgba(220, 38, 38, 0.82);
     }
 
     .btnRow {
@@ -217,7 +208,8 @@
 
     .btnPrimary:active { background: var(--primary-dark); }
 
-    button:disabled {
+    button:disabled,
+    input:disabled {
       opacity: 0.55;
       cursor: not-allowed;
     }
@@ -296,9 +288,7 @@
       margin-right: 6px;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     #captureCanvas { display: none; }
   </style>
@@ -307,7 +297,7 @@
 <body>
   <div class="app">
     <h1 class="title">AI 안전모 검사</h1>
-    <div class="sub">얼굴 부위는 흐림 처리하고, 안전모와 턱끈 착용 상태만 검사합니다.</div>
+    <div class="sub">카메라 화면에 안전모와 턱끈이 보이게 맞춘 뒤 검사하세요.</div>
 
     <div class="card">
       <div class="field">
@@ -322,7 +312,7 @@
 
       <label class="agree" for="consentInput">
         <input id="consentInput" type="checkbox">
-        <span>현재 카메라 프레임을 AI 안전보호구 검사에 사용하고, 검사 결과를 스프레드시트에 저장하는 것에 동의합니다. 이미지는 저장하지 않습니다.</span>
+        <span>촬영 화면의 현재 프레임을 AI 안전보호구 분석에 사용하고, 검사 결과가 스프레드시트에 저장되는 것에 동의합니다. 이미지는 시트에 저장하지 않습니다.</span>
       </label>
     </div>
 
@@ -331,7 +321,7 @@
         <video id="video" autoplay muted playsinline></video>
         <canvas id="faceBlurCanvas" class="faceBlurCanvas"></canvas>
         <div id="privacyBadge" class="privacyBadge" role="button" tabindex="0">얼굴 흐림 처리</div>
-        <div class="cameraHint">안전모 전체와 턱끈이 잘 보이면 바로 검사하세요</div>
+        <div class="cameraHint">안전모 전체와 턱끈이 보이게 맞춰주세요</div>
       </div>
 
       <div class="btnRow">
@@ -369,18 +359,18 @@
     const helmetPill = document.getElementById('helmetPill');
     const strapPill = document.getElementById('strapPill');
     const facePill = document.getElementById('facePill');
-    const privacyBadge = document.getElementById('privacyBadge');
     const nameInput = document.getElementById('nameInput');
     const siteInput = document.getElementById('siteInput');
     const consentInput = document.getElementById('consentInput');
+    const privacyBadge = document.getElementById('privacyBadge');
 
-    const STORAGE_KEY = 'safetyHelmetFormCacheV2';
-    const STORAGE_TTL = 24 * 60 * 60 * 1000;
+    const SAVED_INPUT_KEY = 'safetyInspectionInputsV1';
+    const SAVED_INPUT_TTL = 24 * 60 * 60 * 1000;
     const CAPTURE_MAX_SIDE = 512;
-    const CAPTURE_QUALITY = 0.50;
-    const POLL_DELAY = 1800;
-    const POLL_MAX_COUNT = 85;
-    const FACE_DETECTION_INTERVAL = 280;
+    const CAPTURE_QUALITY = 0.55;
+    const POLL_DELAY = 2200;
+    const POLL_MAX_COUNT = 75;
+    const FACE_DETECTION_INTERVAL = 450;
 
     let stream = null;
     let isAnalyzing = false;
@@ -404,41 +394,39 @@
         toggleFaceBlur();
       }
     });
-
     nameInput.addEventListener('input', saveSavedInputs);
     siteInput.addEventListener('input', saveSavedInputs);
-
     window.addEventListener('resize', resizeFaceBlurCanvas);
 
     window.addEventListener('load', function() {
       loadSavedInputs();
+      updateFaceBlurBadge();
       initFaceDetector();
       startFaceBlurLoop();
       updateCameraButtonState();
-      updateFaceBlurBadge();
-      setStatus('카메라를 켠 뒤 안전모와 턱끈이 보이면 검사해 주세요.');
+      setStatus('카메라를 켜고 검사하세요.');
       startCamera(true);
     });
 
     function loadSavedInputs() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(SAVED_INPUT_KEY);
         if (!raw) return;
 
-        const data = JSON.parse(raw);
-        if (!data || !data.savedAt || Date.now() - data.savedAt > STORAGE_TTL) {
-          localStorage.removeItem(STORAGE_KEY);
+        const saved = JSON.parse(raw);
+        if (!saved || !saved.savedAt || Date.now() - saved.savedAt > SAVED_INPUT_TTL) {
+          localStorage.removeItem(SAVED_INPUT_KEY);
           return;
         }
 
-        if (data.name) nameInput.value = data.name;
-        if (data.siteName) siteInput.value = data.siteName;
+        if (saved.name) nameInput.value = saved.name;
+        if (saved.siteName) siteInput.value = saved.siteName;
       } catch (err) {}
     }
 
     function saveSavedInputs() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        localStorage.setItem(SAVED_INPUT_KEY, JSON.stringify({
           name: nameInput.value.trim(),
           siteName: siteInput.value.trim(),
           savedAt: Date.now()
@@ -449,13 +437,8 @@
     function initFaceDetector() {
       try {
         if ('FaceDetector' in window) {
-          faceDetector = new FaceDetector({
-            fastMode: true,
-            maxDetectedFaces: 1
-          });
+          faceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
           detectorReady = true;
-        } else {
-          detectorUnavailable = true;
         }
       } catch (err) {
         detectorUnavailable = true;
@@ -475,8 +458,7 @@
       if (stream) return;
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setStatus('이 브라우저는 카메라 기능을 지원하지 않습니다.');
-        updateCameraButtonState();
+        setStatus('이 브라우저는 카메라 기능을 지원하지 않습니다. Chrome 또는 Samsung Internet으로 열어주세요.');
         return;
       }
 
@@ -487,8 +469,8 @@
           audio: false,
           video: {
             facingMode: 'user',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            width: { ideal: 640 },
+            height: { ideal: 640 }
           }
         };
 
@@ -500,20 +482,18 @@
         });
 
         await video.play();
-        lastDetectedFace = null;
-        setStatus('검사 준비 완료');
+        setStatus('카메라 준비 완료');
+        updateCameraButtonState();
       } catch (err) {
         stream = null;
         video.srcObject = null;
-        clearFaceBlurCanvas();
+        updateCameraButtonState();
         if (!silent) {
           setStatus(getCameraErrorMessage(err));
         } else {
-          setStatus('카메라를 켜서 검사해 주세요.');
+          setStatus('카메라 켜기를 눌러 권한을 허용해 주세요.');
         }
       }
-
-      updateCameraButtonState();
     }
 
     function stopCamera() {
@@ -532,13 +512,12 @@
       updateCameraButtonState();
     }
 
-    function pauseCameraForAnalysis() {
-      try { video.pause(); } catch (err) {}
-    }
-
-    async function resumeCameraAfterAnalysis() {
-      if (!stream) return;
-      try { await video.play(); } catch (err) {}
+    function getCameraErrorMessage(err) {
+      const name = err && err.name ? err.name : '';
+      if (name === 'NotAllowedError') return '카메라 권한을 허용해 주세요.';
+      if (name === 'NotFoundError') return '사용 가능한 카메라를 찾지 못했습니다.';
+      if (name === 'NotReadableError') return '다른 앱이 카메라를 사용 중일 수 있습니다.';
+      return '카메라를 시작하지 못했습니다.';
     }
 
     function updateCameraButtonState() {
@@ -557,14 +536,6 @@
       privacyBadge.style.opacity = disabled ? '0.65' : '1';
     }
 
-    function getCameraErrorMessage(err) {
-      const name = err && err.name ? err.name : '';
-      if (name === 'NotAllowedError') return '카메라 권한을 허용해 주세요.';
-      if (name === 'NotFoundError') return '사용 가능한 카메라를 찾지 못했습니다.';
-      if (name === 'NotReadableError') return '다른 앱이 카메라를 사용 중일 수 있습니다.';
-      return '카메라를 시작하지 못했습니다.';
-    }
-
     function validateForm() {
       const name = nameInput.value.trim();
       const siteName = siteInput.value.trim();
@@ -576,15 +547,15 @@
       if (!consent) throw new Error('촬영동의 체크가 필요합니다.');
       if (!stream || !video.videoWidth || !video.videoHeight) throw new Error('카메라가 아직 준비되지 않았습니다.');
 
-      return { name, siteName, consent };
+      return { name: name, siteName: siteName, consent: consent };
     }
 
     function captureInspectionJpeg() {
       const vw = video.videoWidth;
       const vh = video.videoHeight;
       const scale = Math.min(CAPTURE_MAX_SIDE / Math.max(vw, vh), 1);
-      const outputWidth = Math.max(240, Math.round(vw * scale));
-      const outputHeight = Math.max(240, Math.round(vh * scale));
+      const outputWidth = Math.max(300, Math.round(vw * scale));
+      const outputHeight = Math.max(300, Math.round(vh * scale));
 
       captureCanvas.width = outputWidth;
       captureCanvas.height = outputHeight;
@@ -592,10 +563,8 @@
       const ctx = captureCanvas.getContext('2d', { willReadFrequently: false });
       ctx.clearRect(0, 0, outputWidth, outputHeight);
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.filter = 'brightness(1.04) contrast(1.08) saturate(1.03)';
+      ctx.imageSmoothingQuality = 'medium';
       ctx.drawImage(video, 0, 0, outputWidth, outputHeight);
-      ctx.filter = 'none';
 
       if (faceBlurApplied) {
         applyFaceBlurToCapture(ctx, outputWidth, outputHeight, outputWidth / vw, outputHeight / vh);
@@ -605,7 +574,7 @@
     }
 
     function applyFaceBlurToCapture(ctx, outputWidth, outputHeight, scaleX, scaleY) {
-      let box = null;
+      let box;
 
       if (lastDetectedFace) {
         const face = readFaceRect(lastDetectedFace);
@@ -616,56 +585,11 @@
           height: face.height * scaleY
         };
       } else {
-        box = getFallbackCaptureFaceBox(outputWidth, outputHeight);
+        box = getFallbackFaceBox(outputWidth, outputHeight);
       }
 
-      if (!box) return;
-
       const blurBox = makePrivacyFaceBox(box, outputWidth, outputHeight);
-      blurCanvasArea(ctx, captureCanvas, blurBox, 42);
-    }
-
-    function getFallbackCaptureFaceBox(width, height) {
-      const w = width * 0.34;
-      const h = height * 0.42;
-
-      return {
-        x: (width - w) / 2,
-        y: height * 0.30,
-        width: w,
-        height: h
-      };
-    }
-
-    function makePrivacyFaceBox(box, limitWidth, limitHeight) {
-      const cx = box.x + box.width / 2;
-      // 얼굴 인식 박스가 이마 쪽으로 잡히는 경우가 많아 중심을 살짝 아래로 내립니다.
-      const cy = box.y + box.height / 2 + box.height * 0.09;
-      // 원형에 가까웠던 블러를 세로로 긴 달걀형으로 변경합니다.
-      const width = Math.min(box.width * 0.96, limitWidth);
-      const height = Math.min(box.height * 1.18, limitHeight);
-      const x = Math.max(0, Math.min(cx - width / 2, limitWidth - width));
-      const y = Math.max(0, Math.min(cy - height / 2, limitHeight - height));
-
-      return { x: x, y: y, width: width, height: height };
-    }
-
-    function blurCanvasArea(ctx, sourceCanvas, box, blurAmount) {
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = sourceCanvas.width;
-      tempCanvas.height = sourceCanvas.height;
-
-      const tempCtx = tempCanvas.getContext('2d');
-      tempCtx.drawImage(sourceCanvas, 0, 0);
-
-      ctx.save();
-      makeOvalClip(ctx, box);
-      ctx.filter = 'blur(' + blurAmount + 'px)';
-      ctx.drawImage(tempCanvas, 0, 0);
-      ctx.filter = 'none';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
-      ctx.fill();
-      ctx.restore();
+      blurCanvasArea(ctx, captureCanvas, blurBox, 34, false);
     }
 
     function makeRequestId() {
@@ -684,16 +608,16 @@
       }
 
       saveSavedInputs();
-      isAnalyzing = true;
-      pauseCameraForAnalysis();
-      setControlsForAnalysis(true);
-      analyzeBtn.innerHTML = '<span class="spinner"></span>검사 중';
       clearResult();
-      setStatus('검사 중');
 
       const imageDataUrl = captureInspectionJpeg();
       currentRequestId = makeRequestId();
       pollCount = 0;
+      isAnalyzing = true;
+      try { video.pause(); } catch (err) {}
+      setControlsForAnalysis(true);
+      analyzeBtn.innerHTML = '<span class="spinner"></span>검사 중';
+      setStatus('검사 중');
 
       const payload = {
         requestId: currentRequestId,
@@ -715,24 +639,18 @@
       };
 
       try {
-        await postPayloadByFetch(payload);
+        await fetch(GAS_WEB_APP_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
       } catch (err) {
         finishAsError('요청 전송에 실패했습니다. 네트워크 상태를 확인해 주세요.');
         return;
       }
 
       startPollingResult(currentRequestId);
-    }
-
-    async function postPayloadByFetch(payload) {
-      await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: JSON.stringify(payload)
-      });
     }
 
     function startPollingResult(requestId) {
@@ -746,13 +664,12 @@
       pollCount++;
 
       if (pollCount > POLL_MAX_COUNT) {
-        finishAsError('검사 결과를 받지 못했습니다. 네트워크 상태를 확인해 주세요.');
+        finishAsError('검사 결과를 받지 못했습니다. 다시 검사해 주세요.');
         return;
       }
 
-      setStatus('검사 중');
-
       const callbackName = '__gasResultCallback_' + requestId.replace(/[^a-zA-Z0-9_]/g, '_') + '_' + pollCount;
+      let script = null;
 
       window[callbackName] = function(data) {
         cleanupJsonp(callbackName, script);
@@ -767,10 +684,10 @@
           return;
         }
 
-        finishAsError(data.message || '검사 결과를 받지 못했습니다. 네트워크 상태를 확인해 주세요.');
+        finishAsError(data.message || '검사 처리 중 문제가 발생했습니다. 다시 검사해 주세요.');
       };
 
-      const script = document.createElement('script');
+      script = document.createElement('script');
       script.src = GAS_WEB_APP_URL +
         '?action=result' +
         '&requestId=' + encodeURIComponent(requestId) +
@@ -802,7 +719,7 @@
       isAnalyzing = false;
       analyzeBtn.textContent = '검사';
       setControlsForAnalysis(false);
-      await resumeCameraAfterAnalysis();
+      try { if (stream) await video.play(); } catch (err) {}
       updateCameraButtonState();
       showResult(data.result);
     }
@@ -812,9 +729,9 @@
       isAnalyzing = false;
       analyzeBtn.textContent = '검사';
       setControlsForAnalysis(false);
-      await resumeCameraAfterAnalysis();
+      try { if (stream) await video.play(); } catch (err) {}
       updateCameraButtonState();
-      showError(cleanErrorMessage(message));
+      showError(message);
     }
 
     function showResult(result) {
@@ -824,7 +741,6 @@
       resultBox.className = 'resultBox ' + (isOk ? 'ok' : 'ng');
       resultSign.textContent = isOk ? 'OK' : 'NG';
       resultText.textContent = (safe.reason || '') + '\n' + (safe.action || '');
-
       helmetPill.textContent = '안전모 ' + safe.hardhat;
       strapPill.textContent = '턱끈 ' + safe.chinstrap;
       facePill.textContent = '감지 ' + (safe.personVisible ? 'Y' : 'N');
@@ -842,7 +758,7 @@
         hardhat: hardhat,
         chinstrap: chinstrap,
         personVisible: personVisible,
-        reason: result.reason || (overall === 'OK' ? '안전모와 턱끈 착용이 확인되었습니다.' : '안전모와 턱끈 착용 상태를 다시 확인해 주세요.'),
+        reason: result.reason || (overall === 'OK' ? '안전모와 턱끈 착용이 확인되었습니다.' : '안전모와 턱끈 착용 상태를 확인해 주세요.'),
         action: result.action || (overall === 'OK' ? '출입 가능합니다.' : '안전모와 턱끈을 착용한 뒤 다시 검사해 주세요.')
       };
     }
@@ -850,20 +766,11 @@
     function showError(message) {
       resultBox.className = 'resultBox ng';
       resultSign.textContent = '오류';
-      resultText.textContent = message;
+      resultText.textContent = message || '검사 처리 중 문제가 발생했습니다. 다시 검사해 주세요.';
       helmetPill.textContent = '안전모 -';
       strapPill.textContent = '턱끈 -';
       facePill.textContent = '감지 -';
-      setStatus(message);
-    }
-
-    function cleanErrorMessage(text) {
-      const msg = String(text || '').trim();
-      if (!msg) return '검사 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.';
-      if (/AI|Gemini|JSON|파싱|HTTP|API|script|server|서버|결과/i.test(msg)) {
-        return '검사 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.';
-      }
-      return msg;
+      setStatus(message || '검사 처리 중 문제가 발생했습니다. 다시 검사해 주세요.');
     }
 
     function clearResult() {
@@ -891,12 +798,6 @@
       privacyBadge.classList.toggle('off', !faceBlurApplied);
     }
 
-    function clearFaceBlurCanvas() {
-      const ctx = faceBlurCanvas.getContext('2d');
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, faceBlurCanvas.width, faceBlurCanvas.height);
-    }
-
     function resizeFaceBlurCanvas() {
       const rect = cameraBox.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
@@ -911,6 +812,12 @@
         faceBlurCanvas.style.width = rect.width + 'px';
         faceBlurCanvas.style.height = rect.height + 'px';
       }
+    }
+
+    function clearFaceBlurCanvas() {
+      const ctx = faceBlurCanvas.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, faceBlurCanvas.width, faceBlurCanvas.height);
     }
 
     function startFaceBlurLoop() {
@@ -957,14 +864,12 @@
 
       if (!faceBlurApplied) return;
 
-      let faceBox = null;
+      let faceBox;
       if (lastDetectedFace) {
         faceBox = mapVideoFaceToCanvas(lastDetectedFace, width, height);
       } else {
-        faceBox = getFallbackOverlayFaceBox(width, height);
+        faceBox = getFallbackFaceBox(width, height);
       }
-
-      if (!faceBox) return;
 
       const blurBox = makePrivacyFaceBox(faceBox, width, height);
       drawBlurredVideoPatch(ctx, blurBox, width, height);
@@ -975,7 +880,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.filter = 'blur(42px)';
+      ctx.filter = 'blur(34px)';
       ctx.translate(canvasWidth, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, cover.x, cover.y, cover.width, cover.height);
@@ -983,12 +888,13 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
       ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.46)';
-      ctx.stroke();
       ctx.restore();
+    }
+
+    function applyMirrorXForDisplay(x, width, canvasWidth) {
+      return canvasWidth - (x + width);
     }
 
     function getVideoCoverRect(canvasWidth, canvasHeight) {
@@ -1011,16 +917,16 @@
       const cover = getVideoCoverRect(canvasWidth, canvasHeight);
       const scale = cover.width / video.videoWidth;
 
-      const x = cover.x + face.x * scale;
+      const rawX = cover.x + face.x * scale;
       const y = cover.y + face.y * scale;
-      const w = face.width * scale;
-      const h = face.height * scale;
+      const width = face.width * scale;
+      const height = face.height * scale;
 
       return {
-        x: canvasWidth - (x + w),
+        x: applyMirrorXForDisplay(rawX, width, canvasWidth),
         y: y,
-        width: w,
-        height: h
+        width: width,
+        height: height
       };
     }
 
@@ -1033,16 +939,50 @@
       };
     }
 
-    function getFallbackOverlayFaceBox(width, height) {
-      const w = width * 0.34;
-      const h = height * 0.42;
+    function getFallbackFaceBox(width, height) {
+      const w = width * 0.28;
+      const h = height * 0.36;
 
       return {
         x: (width - w) / 2,
-        y: height * 0.30,
+        y: height * 0.34,
         width: w,
         height: h
       };
+    }
+
+    function makePrivacyFaceBox(box, limitWidth, limitHeight) {
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2 + box.height * 0.08;
+      const width = Math.min(box.width * 0.86, limitWidth);
+      const height = Math.min(box.height * 1.04, limitHeight);
+      const x = Math.max(0, Math.min(cx - width / 2, limitWidth - width));
+      const y = Math.max(0, Math.min(cy - height / 2, limitHeight - height));
+
+      return { x: x, y: y, width: width, height: height };
+    }
+
+    function blurCanvasArea(ctx, sourceCanvas, box, blurAmount, drawStroke) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = sourceCanvas.width;
+      tempCanvas.height = sourceCanvas.height;
+
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(sourceCanvas, 0, 0);
+
+      ctx.save();
+      makeOvalClip(ctx, box);
+      ctx.filter = 'blur(' + blurAmount + 'px)';
+      ctx.drawImage(tempCanvas, 0, 0);
+      ctx.filter = 'none';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.20)';
+      ctx.fill();
+      if (drawStroke) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     function makeOvalClip(ctx, box) {
