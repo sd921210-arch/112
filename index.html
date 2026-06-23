@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz4Irou1gB_x012DV-XTsjVg5hVsUUAala_D9kdPJJg6AX7Ghd70-lUkDHF_vQIzfAF/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxikQnGVe51ZLMZ0TKYyQ3xnMVCEjx6p3hNRwIYIDlOYrJ9B-0102VYCMHxxHBETAKA/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -382,8 +382,8 @@
 
     const STORAGE_KEY = 'helmetSafetyInputs:v1';
     const STORAGE_TTL = 24 * 60 * 60 * 1000;
-    const CAPTURE_SIZE = 224;
-    const CAPTURE_QUALITY = 0.34;
+    const CAPTURE_SIZE = 288;
+    const CAPTURE_QUALITY = 0.42;
     const FACE_DETECTION_INTERVAL = 120;
 
     let stream = null;
@@ -647,8 +647,8 @@
 
       if (!box) return;
 
-      const blurBox = expandBox(box, CAPTURE_SIZE, CAPTURE_SIZE, 1.22, 1.28, -0.02);
-      blurCanvasArea(ctx, captureCanvas, blurBox, 10);
+      const blurBox = expandBox(box, CAPTURE_SIZE, CAPTURE_SIZE, 1.12, 1.08, -0.08);
+      blurCanvasArea(ctx, captureCanvas, blurBox, 9);
     }
 
     function blurCanvasArea(ctx, sourceCanvas, box, blurAmount) {
@@ -737,14 +737,14 @@
 
       pollTimer = setTimeout(() => {
         pollResult(requestId);
-      }, 1500);
+      }, 1300);
     }
 
     function pollResult(requestId) {
       pollCount++;
 
-      if (pollCount > 40) {
-        finishAsError('검사 시간이 초과되었습니다. 다시 시도해 주세요.');
+      if (pollCount > 70) {
+        finishAsError('검사 결과를 받지 못했습니다. 다시 검사해 주세요.');
         return;
       }
 
@@ -836,13 +836,23 @@
     }
 
     function showError(message) {
+      const safeMessage = getSafeErrorMessage(message);
       resultBox.className = 'resultBox ng';
       resultSign.textContent = 'NG';
-      resultText.textContent = message;
+      resultText.textContent = safeMessage;
       helmetPill.textContent = '안전모 -';
       strapPill.textContent = '턱끈 -';
       facePill.textContent = '감지 -';
-      setStatus(message);
+      setStatus(safeMessage);
+    }
+
+    function getSafeErrorMessage(message) {
+      const text = String(message || '').trim();
+
+      if (!text) return '검사 결과를 받지 못했습니다. 다시 검사해 주세요.';
+      if (/AI|Gemini|JSON|응답|파싱|HTTP|API/i.test(text)) return '검사 결과를 받지 못했습니다. 다시 검사해 주세요.';
+
+      return text;
     }
 
     function clearResult() {
@@ -968,7 +978,7 @@
 
       if (!faceBox) return;
 
-      const blurBox = expandBox(faceBox, width, height, 1.24, 1.32, -0.02);
+      const blurBox = expandBox(faceBox, width, height, 1.14, 1.12, -0.08);
       drawBlurredVideoPatch(ctx, blurBox, width, height);
     }
 
@@ -977,7 +987,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.filter = 'blur(16px)';
+      ctx.filter = 'blur(14px)';
       ctx.translate(canvasWidth, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, cover.x, cover.y, cover.width, cover.height);
