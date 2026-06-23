@@ -1,4 +1,3 @@
-ㄴㅇㅍㄴㅇㄴㅍ
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -6,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyj7T7iLDRpIArgSYXb4KIbh48CoUAjCSRryt2uXIDj0ihA73X8wFZqQbl2R9SgTF-k/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwtP1mipRoB4IiAqqsWXhkgdZEgTVRrujnWqK_It2duJU8W4UWYtwJtUfvlpOms6BkE/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -20,10 +19,12 @@
       --line: #e5e7eb;
       --primary: #2563eb;
       --primary-dark: #1d4ed8;
-      --ok: #16a34a;
       --ok-bg: #dcfce7;
-      --ng: #dc2626;
+      --ok-border: #86efac;
+      --ok-text: #14532d;
       --ng-bg: #fee2e2;
+      --ng-border: #fecaca;
+      --ng-text: #7f1d1d;
     }
 
     * { box-sizing: border-box; }
@@ -90,6 +91,11 @@
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
+    input:disabled {
+      opacity: 0.7;
+      background: #f8fafc;
+    }
+
     .field { margin-bottom: 12px; }
 
     .agree {
@@ -150,7 +156,7 @@
       width: 58%;
       height: 72%;
       transform: translate(-50%, -50%);
-      border: 3px solid rgba(255, 255, 255, 0.5);
+      border: 3px solid rgba(255, 255, 255, 0.48);
       border-radius: 50%;
       pointer-events: none;
       box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.05);
@@ -179,7 +185,7 @@
       color: white;
       font-size: 12px;
       font-weight: 800;
-      background: rgba(15, 23, 42, 0.62);
+      background: rgba(15, 23, 42, 0.68);
       border: 1px solid rgba(255, 255, 255, 0.32);
       border-radius: 999px;
       padding: 7px 10px;
@@ -191,7 +197,7 @@
     }
 
     .privacyBadge.off {
-      background: rgba(220, 38, 38, 0.78);
+      background: rgba(220, 38, 38, 0.82);
     }
 
     .btnRow {
@@ -239,15 +245,15 @@
     .resultBox.ok {
       display: block;
       background: var(--ok-bg);
-      border-color: #86efac;
-      color: #14532d;
+      border-color: var(--ok-border);
+      color: var(--ok-text);
     }
 
     .resultBox.ng {
       display: block;
       background: var(--ng-bg);
-      border-color: #fecaca;
-      color: #7f1d1d;
+      border-color: var(--ng-border);
+      color: var(--ng-text);
     }
 
     .resultSign {
@@ -333,12 +339,12 @@
     </div>
 
     <div class="card">
-      <div class="cameraBox" id="cameraBox">
+      <div id="cameraBox" class="cameraBox">
         <video id="video" autoplay muted playsinline></video>
         <canvas id="faceBlurCanvas" class="faceBlurCanvas"></canvas>
         <div id="privacyBadge" class="privacyBadge" role="button" tabindex="0">얼굴 흐림 처리</div>
         <div class="guideOval"></div>
-        <div class="cameraHint">안전모 전체 · 턱끈이 보이게 맞춰주세요</div>
+        <div class="cameraHint">안전모 전체와 턱끈이 보이게 화면 중앙에 맞춰주세요</div>
       </div>
 
       <div class="btnRow">
@@ -366,7 +372,6 @@
     const video = document.getElementById('video');
     const captureCanvas = document.getElementById('captureCanvas');
     const faceBlurCanvas = document.getElementById('faceBlurCanvas');
-    const privacyBadge = document.getElementById('privacyBadge');
     const cameraBox = document.getElementById('cameraBox');
     const cameraBtn = document.getElementById('cameraBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -377,18 +382,18 @@
     const helmetPill = document.getElementById('helmetPill');
     const strapPill = document.getElementById('strapPill');
     const facePill = document.getElementById('facePill');
+    const privacyBadge = document.getElementById('privacyBadge');
     const nameInput = document.getElementById('nameInput');
     const siteInput = document.getElementById('siteInput');
     const consentInput = document.getElementById('consentInput');
 
-    const STORAGE_KEY = 'helmetSafetyInputs:v1';
+    const STORAGE_KEY = 'safetyHelmetFormCacheV2';
     const STORAGE_TTL = 24 * 60 * 60 * 1000;
-    const CAPTURE_SIZE = 288;
-    const CAPTURE_QUALITY = 0.42;
-    const FACE_DETECTION_INTERVAL = 120;
-    const POLL_INTERVAL_MS = 1500;
-    const POLL_MAX_COUNT = 100;
-    const JSONP_TIMEOUT_MS = 9000;
+    const CAPTURE_MAX_SIDE = 720;
+    const CAPTURE_QUALITY = 0.74;
+    const POLL_DELAY = 1800;
+    const POLL_MAX_COUNT = 85;
+    const FACE_DETECTION_INTERVAL = 280;
 
     let stream = null;
     let isAnalyzing = false;
@@ -406,22 +411,25 @@
     cameraBtn.addEventListener('click', toggleCamera);
     analyzeBtn.addEventListener('click', analyzeCurrentFrame);
     privacyBadge.addEventListener('click', toggleFaceBlur);
-    privacyBadge.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
+    privacyBadge.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
         toggleFaceBlur();
       }
     });
+
     nameInput.addEventListener('input', saveSavedInputs);
     siteInput.addEventListener('input', saveSavedInputs);
+
     window.addEventListener('resize', resizeFaceBlurCanvas);
 
-    window.addEventListener('load', () => {
+    window.addEventListener('load', function() {
       loadSavedInputs();
       initFaceDetector();
-      updateFaceBlurBadge();
+      startFaceBlurLoop();
       updateCameraButtonState();
-      setStatus('카메라를 허용해 주세요.');
+      updateFaceBlurBadge();
+      setStatus('카메라를 켠 뒤 검사해 주세요.');
       startCamera(true);
     });
 
@@ -430,29 +438,23 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
 
-        const saved = JSON.parse(raw);
-
-        if (!saved || !saved.expiresAt || Date.now() > saved.expiresAt) {
+        const data = JSON.parse(raw);
+        if (!data || !data.savedAt || Date.now() - data.savedAt > STORAGE_TTL) {
           localStorage.removeItem(STORAGE_KEY);
           return;
         }
 
-        nameInput.value = saved.name || '';
-        siteInput.value = saved.siteName || '';
-      } catch (err) {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+        if (data.name) nameInput.value = data.name;
+        if (data.siteName) siteInput.value = data.siteName;
+      } catch (err) {}
     }
 
     function saveSavedInputs() {
-      const name = nameInput.value.trim();
-      const siteName = siteInput.value.trim();
-
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          name,
-          siteName,
-          expiresAt: Date.now() + STORAGE_TTL
+          name: nameInput.value.trim(),
+          siteName: siteInput.value.trim(),
+          savedAt: Date.now()
         }));
       } catch (err) {}
     }
@@ -469,14 +471,12 @@
           detectorUnavailable = true;
         }
       } catch (err) {
-        faceDetector = null;
         detectorUnavailable = true;
       }
     }
 
     async function toggleCamera() {
       if (isAnalyzing) return;
-
       if (stream) {
         stopCamera();
       } else {
@@ -485,93 +485,73 @@
     }
 
     async function startCamera(silent) {
-      if (stream) {
-        updateCameraButtonState();
-        return;
-      }
+      if (stream) return;
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setStatus('카메라 기능을 지원하는 브라우저로 열어주세요.');
+        setStatus('이 브라우저는 카메라 기능을 지원하지 않습니다.');
         updateCameraButtonState();
         return;
       }
 
       try {
         setStatus('카메라 준비 중');
-        cameraBtn.disabled = true;
 
         const constraints = {
           audio: false,
           video: {
             facingMode: 'user',
-            width: { ideal: 360 },
-            height: { ideal: 360 }
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           }
         };
 
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
 
-        await new Promise((resolve) => {
-          video.onloadedmetadata = () => resolve();
+        await new Promise(function(resolve) {
+          video.onloadedmetadata = function() { resolve(); };
         });
 
         await video.play();
-
-        resizeFaceBlurCanvas();
-        startFaceBlurLoop();
-
-        analyzeBtn.disabled = false;
-        updateCameraButtonState();
+        lastDetectedFace = null;
         setStatus('검사 준비 완료');
       } catch (err) {
         stream = null;
         video.srcObject = null;
-        analyzeBtn.disabled = true;
-        updateCameraButtonState();
-
+        clearFaceBlurCanvas();
         if (!silent) {
           setStatus(getCameraErrorMessage(err));
         } else {
-          setStatus('카메라 켜기를 눌러주세요.');
+          setStatus('카메라를 켜서 검사해 주세요.');
         }
       }
+
+      updateCameraButtonState();
     }
 
     function stopCamera() {
-      if (!stream) {
-        updateCameraButtonState();
-        return;
+      clearTimeout(pollTimer);
+      if (stream) {
+        stream.getTracks().forEach(function(track) {
+          try { track.stop(); } catch (err) {}
+        });
       }
-
-      try {
-        stream.getTracks().forEach((track) => track.stop());
-      } catch (err) {}
-
       stream = null;
       video.pause();
       video.srcObject = null;
       lastDetectedFace = null;
       clearFaceBlurCanvas();
-      analyzeBtn.disabled = true;
-      updateCameraButtonState();
       setStatus('카메라 꺼짐');
+      updateCameraButtonState();
     }
 
     function pauseCameraForAnalysis() {
-      if (!stream) return;
-
-      try {
-        video.pause();
-      } catch (err) {}
+      try { video.pause(); } catch (err) {}
     }
 
     async function resumeCameraAfterAnalysis() {
       if (!stream) return;
-
-      try {
-        await video.play();
-      } catch (err) {}
+      try { await video.play(); } catch (err) {}
     }
 
     function updateCameraButtonState() {
@@ -580,14 +560,21 @@
       analyzeBtn.disabled = isAnalyzing || !stream || !video.videoWidth || !video.videoHeight;
     }
 
+    function setControlsForAnalysis(disabled) {
+      nameInput.disabled = disabled;
+      siteInput.disabled = disabled;
+      consentInput.disabled = disabled;
+      cameraBtn.disabled = disabled;
+      analyzeBtn.disabled = disabled;
+      privacyBadge.style.pointerEvents = disabled ? 'none' : 'auto';
+      privacyBadge.style.opacity = disabled ? '0.65' : '1';
+    }
+
     function getCameraErrorMessage(err) {
       const name = err && err.name ? err.name : '';
-
       if (name === 'NotAllowedError') return '카메라 권한을 허용해 주세요.';
       if (name === 'NotFoundError') return '사용 가능한 카메라를 찾지 못했습니다.';
       if (name === 'NotReadableError') return '다른 앱이 카메라를 사용 중일 수 있습니다.';
-      if (name === 'OverconstrainedError') return '카메라 설정을 불러오지 못했습니다.';
-
       return '카메라를 시작하지 못했습니다.';
     }
 
@@ -605,54 +592,72 @@
       return { name, siteName, consent };
     }
 
-    function captureLowResJpeg() {
+    function captureInspectionJpeg() {
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-      const cropSize = Math.min(vw, vh);
-      const sx = Math.floor((vw - cropSize) / 2);
-      const sy = Math.floor((vh - cropSize) / 2);
+      const scale = Math.min(CAPTURE_MAX_SIDE / Math.max(vw, vh), 1);
+      const outputWidth = Math.max(320, Math.round(vw * scale));
+      const outputHeight = Math.max(320, Math.round(vh * scale));
 
-      captureCanvas.width = CAPTURE_SIZE;
-      captureCanvas.height = CAPTURE_SIZE;
+      captureCanvas.width = outputWidth;
+      captureCanvas.height = outputHeight;
 
       const ctx = captureCanvas.getContext('2d', { willReadFrequently: false });
-      ctx.clearRect(0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
-      ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
+      ctx.clearRect(0, 0, outputWidth, outputHeight);
+      ctx.drawImage(video, 0, 0, outputWidth, outputHeight);
 
       if (faceBlurApplied) {
-        applyFaceBlurToCapture(ctx, sx, sy, cropSize);
+        applyFaceBlurToCapture(ctx, outputWidth, outputHeight, outputWidth / vw, outputHeight / vh);
       }
 
       return captureCanvas.toDataURL('image/jpeg', CAPTURE_QUALITY);
     }
 
-    function applyFaceBlurToCapture(ctx, cropX, cropY, cropSize) {
+    function applyFaceBlurToCapture(ctx, outputWidth, outputHeight, scaleX, scaleY) {
       let box = null;
 
       if (lastDetectedFace) {
         const face = readFaceRect(lastDetectedFace);
-        const scale = CAPTURE_SIZE / cropSize;
-
         box = {
-          x: (face.x - cropX) * scale,
-          y: (face.y - cropY) * scale,
-          width: face.width * scale,
-          height: face.height * scale
+          x: face.x * scaleX,
+          y: face.y * scaleY,
+          width: face.width * scaleX,
+          height: face.height * scaleY
         };
       } else {
-        const size = CAPTURE_SIZE * 0.4;
-        box = {
-          x: (CAPTURE_SIZE - size) / 2,
-          y: CAPTURE_SIZE * 0.29,
-          width: size,
-          height: size * 1.2
-        };
+        box = getFallbackCaptureFaceBox(outputWidth, outputHeight);
       }
 
       if (!box) return;
 
-      const blurBox = expandBox(box, CAPTURE_SIZE, CAPTURE_SIZE, 1.08, 0.86, -0.16);
-      blurCanvasArea(ctx, captureCanvas, blurBox, 9);
+      const blurBox = makePrivacyFaceBox(box, outputWidth, outputHeight);
+      blurCanvasArea(ctx, captureCanvas, blurBox, 28);
+    }
+
+    function getFallbackCaptureFaceBox(width, height) {
+      const w = width * 0.34;
+      const h = height * 0.34;
+
+      return {
+        x: (width - w) / 2,
+        y: height * 0.24,
+        width: w,
+        height: h
+      };
+    }
+
+    function makePrivacyFaceBox(box, limitWidth, limitHeight) {
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height * 0.48;
+      const width = box.width * 1.18;
+      const height = box.height * 0.76;
+
+      return {
+        x: Math.max(0, cx - width / 2),
+        y: Math.max(0, cy - height / 2),
+        width: Math.min(width, limitWidth),
+        height: Math.min(height, limitHeight)
+      };
     }
 
     function blurCanvasArea(ctx, sourceCanvas, box, blurAmount) {
@@ -668,7 +673,7 @@
       ctx.filter = 'blur(' + blurAmount + 'px)';
       ctx.drawImage(tempCanvas, 0, 0);
       ctx.filter = 'none';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
       ctx.fill();
       ctx.restore();
     }
@@ -681,7 +686,6 @@
       if (isAnalyzing) return;
 
       let form;
-
       try {
         form = validateForm();
       } catch (err) {
@@ -690,9 +694,14 @@
       }
 
       saveSavedInputs();
+      isAnalyzing = true;
+      pauseCameraForAnalysis();
+      setControlsForAnalysis(true);
+      analyzeBtn.innerHTML = '<span class="spinner"></span>검사 중';
+      clearResult();
+      setStatus('검사 중');
 
-      const imageDataUrl = captureLowResJpeg();
-
+      const imageDataUrl = captureInspectionJpeg();
       currentRequestId = makeRequestId();
       pollCount = 0;
 
@@ -702,22 +711,18 @@
         siteName: form.siteName,
         consent: form.consent,
         faceBlurApplied: faceBlurApplied,
-        imageDataUrl,
+        imageDataUrl: imageDataUrl,
         clientInfo: {
           userAgent: navigator.userAgent,
-          screen: `${window.innerWidth}x${window.innerHeight} / dpr:${window.devicePixelRatio || 1}`,
+          screen: window.innerWidth + 'x' + window.innerHeight + ' / dpr:' + (window.devicePixelRatio || 1),
           pageUrl: location.href,
-          time: new Date().toISOString(),
-          facePrivacy: faceBlurApplied ? 'blurred' : 'not_applied'
+          videoSize: video.videoWidth + 'x' + video.videoHeight,
+          captureSize: captureCanvas.width + 'x' + captureCanvas.height,
+          faceDetected: !!lastDetectedFace,
+          facePrivacy: faceBlurApplied ? 'blurred' : 'not_applied',
+          time: new Date().toISOString()
         }
       };
-
-      isAnalyzing = true;
-      pauseCameraForAnalysis();
-      setControlsForAnalysis(true);
-      analyzeBtn.innerHTML = '<span class="spinner"></span>검사 중';
-      clearResult();
-      setStatus('검사 중');
 
       try {
         postPayloadByHiddenForm(payload);
@@ -742,10 +747,8 @@
       form.action = GAS_WEB_APP_URL;
       form.target = iframeName;
       form.style.display = 'none';
-      form.acceptCharset = 'UTF-8';
 
-      const input = document.createElement('input');
-      input.type = 'hidden';
+      const input = document.createElement('textarea');
       input.name = 'payload';
       input.value = JSON.stringify(payload);
       form.appendChild(input);
@@ -753,150 +756,141 @@
       document.body.appendChild(form);
       form.submit();
 
-      setTimeout(() => {
+      setTimeout(function() {
         if (form.parentNode) form.parentNode.removeChild(form);
         if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      }, 120000);
+      }, 25000);
     }
 
     function startPollingResult(requestId) {
       clearTimeout(pollTimer);
-
-      pollTimer = setTimeout(() => {
+      pollTimer = setTimeout(function() {
         pollResult(requestId);
-      }, POLL_INTERVAL_MS);
+      }, POLL_DELAY);
     }
 
     function pollResult(requestId) {
       pollCount++;
 
       if (pollCount > POLL_MAX_COUNT) {
-        finishAsError('검사 응답이 지연되었습니다. 다시 검사해 주세요.');
+        finishAsError('검사 결과를 받지 못했습니다. 다시 검사해 주세요.');
         return;
       }
 
       setStatus('검사 중');
 
       const callbackName = '__gasResultCallback_' + requestId.replace(/[^a-zA-Z0-9_]/g, '_') + '_' + pollCount;
-      const script = document.createElement('script');
-      let settled = false;
-      let guardTimer = null;
-
-      function cleanup() {
-        try {
-          delete window[callbackName];
-        } catch (err) {
-          window[callbackName] = undefined;
-        }
-
-        if (guardTimer) {
-          clearTimeout(guardTimer);
-          guardTimer = null;
-        }
-
-        if (script && script.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-      }
-
-      function retryLater() {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        startPollingResult(requestId);
-      }
 
       window[callbackName] = function(data) {
-        if (settled) return;
-        settled = true;
-        cleanup();
+        cleanupJsonp(callbackName, script);
 
         if (!data || data.status === 'PENDING') {
           startPollingResult(requestId);
           return;
         }
 
-        if (data.status === 'ERROR' || data.success === false) {
-          finishAsError(data.message || '검사 중 오류가 발생했습니다.');
-          return;
-        }
-
-        if (data.status === 'DONE' && data.success) {
+        if (data.status === 'DONE' && data.success && data.result) {
           finishAsSuccess(data);
           return;
         }
 
-        startPollingResult(requestId);
+        finishAsError(data.message || '검사 결과를 받지 못했습니다. 다시 검사해 주세요.');
       };
 
-      script.src =
-        GAS_WEB_APP_URL +
+      const script = document.createElement('script');
+      script.src = GAS_WEB_APP_URL +
         '?action=result' +
         '&requestId=' + encodeURIComponent(requestId) +
         '&callback=' + encodeURIComponent(callbackName) +
-        '&t=' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        '&t=' + Date.now();
 
-      script.onerror = retryLater;
-
-      guardTimer = setTimeout(() => {
-        retryLater();
-      }, JSONP_TIMEOUT_MS);
+      script.onerror = function() {
+        cleanupJsonp(callbackName, script);
+        startPollingResult(requestId);
+      };
 
       document.body.appendChild(script);
+
+      setTimeout(function() {
+        if (window[callbackName]) {
+          cleanupJsonp(callbackName, script);
+          startPollingResult(requestId);
+        }
+      }, 9000);
+    }
+
+    function cleanupJsonp(callbackName, script) {
+      try { delete window[callbackName]; } catch (e) { window[callbackName] = undefined; }
+      if (script && script.parentNode) script.parentNode.removeChild(script);
     }
 
     async function finishAsSuccess(data) {
       clearTimeout(pollTimer);
-      showResult(data.result);
-      await resumeCameraAfterAnalysis();
       isAnalyzing = false;
       analyzeBtn.textContent = '검사';
       setControlsForAnalysis(false);
+      await resumeCameraAfterAnalysis();
       updateCameraButtonState();
+      showResult(data.result);
     }
 
     async function finishAsError(message) {
       clearTimeout(pollTimer);
-      showError(message);
-      await resumeCameraAfterAnalysis();
       isAnalyzing = false;
       analyzeBtn.textContent = '검사';
       setControlsForAnalysis(false);
+      await resumeCameraAfterAnalysis();
       updateCameraButtonState();
+      showError(cleanErrorMessage(message));
     }
 
     function showResult(result) {
-      const isOk = result.overall === 'OK';
+      const safe = normalizeClientResult(result || {});
+      const isOk = safe.overall === 'OK';
 
       resultBox.className = 'resultBox ' + (isOk ? 'ok' : 'ng');
       resultSign.textContent = isOk ? 'OK' : 'NG';
-      resultText.textContent = `${result.reason || ''}\n${result.action || ''}`;
+      resultText.textContent = (safe.reason || '') + '\n' + (safe.action || '');
 
-      helmetPill.textContent = '안전모 ' + (result.hardhat || '-');
-      strapPill.textContent = '턱끈 ' + (result.chinstrap || '-');
-      facePill.textContent = '감지 ' + (result.personVisible ? 'Y' : 'N');
-
+      helmetPill.textContent = '안전모 ' + safe.hardhat;
+      strapPill.textContent = '턱끈 ' + safe.chinstrap;
+      facePill.textContent = '감지 ' + (safe.personVisible ? 'Y' : 'N');
       setStatus('검사 완료');
     }
 
-    function showError(message) {
-      const safeMessage = getSafeErrorMessage(message);
-      resultBox.className = 'resultBox ng';
-      resultSign.textContent = 'NG';
-      resultText.textContent = safeMessage;
-      helmetPill.textContent = '안전모 -';
-      strapPill.textContent = '턱끈 -';
-      facePill.textContent = '감지 -';
-      setStatus(safeMessage);
+    function normalizeClientResult(result) {
+      const hardhat = result.hardhat === 'OK' ? 'OK' : 'NG';
+      const chinstrap = result.chinstrap === 'OK' ? 'OK' : 'NG';
+      const personVisible = result.personVisible === true || hardhat === 'OK' || chinstrap === 'OK';
+      const overall = hardhat === 'OK' && chinstrap === 'OK' && personVisible ? 'OK' : 'NG';
+
+      return {
+        overall: overall,
+        hardhat: hardhat,
+        chinstrap: chinstrap,
+        personVisible: personVisible,
+        reason: result.reason || (overall === 'OK' ? '안전모와 턱끈 착용이 확인되었습니다.' : '안전모와 턱끈 착용 상태를 다시 확인해 주세요.'),
+        action: result.action || (overall === 'OK' ? '출입 가능합니다.' : '안전모와 턱끈을 착용한 뒤 다시 검사해 주세요.')
+      };
     }
 
-    function getSafeErrorMessage(message) {
-      const text = String(message || '').trim();
+    function showError(message) {
+      resultBox.className = 'resultBox ng';
+      resultSign.textContent = 'NG';
+      resultText.textContent = message;
+      helmetPill.textContent = '안전모 NG';
+      strapPill.textContent = '턱끈 NG';
+      facePill.textContent = '감지 -';
+      setStatus(message);
+    }
 
-      if (!text) return '검사 응답이 지연되었습니다. 다시 검사해 주세요.';
-      if (/AI|Gemini|JSON|파싱|HTTP|API/i.test(text)) return '검사 판독이 불안정합니다. 다시 검사해 주세요.';
-
-      return text;
+    function cleanErrorMessage(text) {
+      const msg = String(text || '').trim();
+      if (!msg) return '검사 결과를 받지 못했습니다. 다시 검사해 주세요.';
+      if (/AI|Gemini|JSON|파싱|HTTP|API|script|server|서버/i.test(msg)) {
+        return '검사 판독이 안정적이지 않습니다. 다시 검사해 주세요.';
+      }
+      return msg;
     }
 
     function clearResult() {
@@ -912,25 +906,11 @@
       statusEl.textContent = message || '';
     }
 
-    function setControlsForAnalysis(disabled) {
-      cameraBtn.disabled = disabled;
-      analyzeBtn.disabled = disabled;
-      nameInput.disabled = disabled;
-      siteInput.disabled = disabled;
-      consentInput.disabled = disabled;
-      privacyBadge.style.pointerEvents = disabled ? 'none' : 'auto';
-      privacyBadge.style.opacity = disabled ? '0.65' : '1';
-    }
-
     function toggleFaceBlur() {
       if (isAnalyzing) return;
-
       faceBlurApplied = !faceBlurApplied;
       updateFaceBlurBadge();
-
-      if (!faceBlurApplied) {
-        clearFaceBlurCanvas();
-      }
+      if (!faceBlurApplied) clearFaceBlurCanvas();
     }
 
     function updateFaceBlurBadge() {
@@ -947,7 +927,6 @@
     function resizeFaceBlurCanvas() {
       const rect = cameraBox.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-
       if (!rect.width || !rect.height) return;
 
       const targetWidth = Math.round(rect.width * dpr);
@@ -963,7 +942,6 @@
 
     function startFaceBlurLoop() {
       if (blurLoopStarted) return;
-
       blurLoopStarted = true;
       requestAnimationFrame(drawFaceBlurLoop);
     }
@@ -971,7 +949,7 @@
     async function drawFaceBlurLoop() {
       resizeFaceBlurCanvas();
 
-      if (stream && video.videoWidth && video.videoHeight) {
+      if (stream && video.videoWidth && video.videoHeight && !video.paused) {
         await updateFaceDetection();
         drawFaceBlurOverlay();
       }
@@ -981,14 +959,8 @@
 
     async function updateFaceDetection() {
       const now = Date.now();
-
-      if (!detectorReady || detectorUnavailable || !faceDetector) {
-        return;
-      }
-
-      if (now - lastDetectionAt < FACE_DETECTION_INTERVAL) {
-        return;
-      }
+      if (!detectorReady || detectorUnavailable || !faceDetector) return;
+      if (now - lastDetectionAt < FACE_DETECTION_INTERVAL) return;
 
       lastDetectionAt = now;
 
@@ -1013,16 +985,15 @@
       if (!faceBlurApplied) return;
 
       let faceBox = null;
-
       if (lastDetectedFace) {
         faceBox = mapVideoFaceToCanvas(lastDetectedFace, width, height);
       } else {
-        faceBox = getFallbackFaceBox(width, height);
+        faceBox = getFallbackOverlayFaceBox(width, height);
       }
 
       if (!faceBox) return;
 
-      const blurBox = expandBox(faceBox, width, height, 1.10, 0.92, -0.14);
+      const blurBox = makePrivacyFaceBox(faceBox, width, height);
       drawBlurredVideoPatch(ctx, blurBox, width, height);
     }
 
@@ -1031,7 +1002,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.filter = 'blur(14px)';
+      ctx.filter = 'blur(30px)';
       ctx.translate(canvasWidth, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, cover.x, cover.y, cover.width, cover.height);
@@ -1039,10 +1010,10 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.46)';
       ctx.stroke();
       ctx.restore();
     }
@@ -1057,8 +1028,8 @@
       return {
         x: (canvasWidth - width) / 2,
         y: (canvasHeight - height) / 2,
-        width,
-        height
+        width: width,
+        height: height
       };
     }
 
@@ -1074,7 +1045,7 @@
 
       return {
         x: canvasWidth - (x + w),
-        y,
+        y: y,
         width: w,
         height: h
       };
@@ -1089,42 +1060,31 @@
       };
     }
 
-    function getFallbackFaceBox(width, height) {
-      const size = Math.min(width, height) * 0.38;
+    function getFallbackOverlayFaceBox(width, height) {
+      const w = width * 0.34;
+      const h = height * 0.34;
 
       return {
-        x: (width - size) / 2,
-        y: height * 0.29,
-        width: size,
-        height: size * 1.2
-      };
-    }
-
-    function expandBox(box, limitWidth, limitHeight, widthScale, heightScale, yOffsetRatio) {
-      const cx = box.x + box.width / 2;
-      const cy = box.y + box.height / 2 + box.height * (yOffsetRatio || 0);
-      const width = box.width * widthScale;
-      const height = box.height * heightScale;
-
-      return {
-        x: Math.max(0, cx - width / 2),
-        y: Math.max(0, cy - height / 2),
-        width: Math.min(width, limitWidth),
-        height: Math.min(height, limitHeight)
+        x: (width - w) / 2,
+        y: height * 0.24,
+        width: w,
+        height: h
       };
     }
 
     function makeOvalClip(ctx, box) {
+      const x = box.x;
+      const y = box.y;
+      const w = box.width;
+      const h = box.height;
+
       ctx.beginPath();
-      ctx.ellipse(
-        box.x + box.width / 2,
-        box.y + box.height / 2,
-        box.width / 2,
-        box.height / 2,
-        0,
-        0,
-        Math.PI * 2
-      );
+      if (ctx.ellipse) {
+        ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+      } else {
+        ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+      }
+      ctx.closePath();
       ctx.clip();
     }
   </script>
