@@ -1,3 +1,5 @@
+ㅇㄹㅇㄹㅇㅁㅁㅁㅁ
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -5,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz_TAz3gqOT1GNDMdIrBlWjP_-Mk9Z4j55bbgVIVQeR4U5zsE1A4Z-__pkmzWUHpj9C/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxNDinWrwxBg-YhOMe8c4Ggv_5MuMngd9yixB9uisleiKBJBkgOi65ct6pl2n8SseSH/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -374,8 +376,8 @@
 
     const STORAGE_KEY = 'safetyHelmetFormCacheV2';
     const STORAGE_TTL = 24 * 60 * 60 * 1000;
-    const CAPTURE_MAX_SIDE = 420;
-    const CAPTURE_QUALITY = 0.54;
+    const CAPTURE_MAX_SIDE = 512;
+    const CAPTURE_QUALITY = 0.50;
     const POLL_DELAY = 1800;
     const POLL_MAX_COUNT = 85;
     const FACE_DETECTION_INTERVAL = 280;
@@ -620,16 +622,16 @@
       if (!box) return;
 
       const blurBox = makePrivacyFaceBox(box, outputWidth, outputHeight);
-      blurCanvasArea(ctx, captureCanvas, blurBox, 50);
+      blurCanvasArea(ctx, captureCanvas, blurBox, 42);
     }
 
     function getFallbackCaptureFaceBox(width, height) {
-      const w = width * 0.44;
-      const h = height * 0.50;
+      const w = width * 0.34;
+      const h = height * 0.42;
 
       return {
         x: (width - w) / 2,
-        y: height * 0.24,
+        y: height * 0.30,
         width: w,
         height: h
       };
@@ -638,10 +640,10 @@
     function makePrivacyFaceBox(box, limitWidth, limitHeight) {
       const cx = box.x + box.width / 2;
       // 얼굴 인식 박스가 이마 쪽으로 잡히는 경우가 많아 중심을 살짝 아래로 내립니다.
-      const cy = box.y + box.height / 2 + box.height * 0.13;
+      const cy = box.y + box.height / 2 + box.height * 0.09;
       // 원형에 가까웠던 블러를 세로로 긴 달걀형으로 변경합니다.
-      const width = Math.min(box.width * 1.18, limitWidth);
-      const height = Math.min(box.height * 1.42, limitHeight);
+      const width = Math.min(box.width * 0.96, limitWidth);
+      const height = Math.min(box.height * 1.18, limitHeight);
       const x = Math.max(0, Math.min(cx - width / 2, limitWidth - width));
       const y = Math.max(0, Math.min(cy - height / 2, limitHeight - height));
 
@@ -661,7 +663,7 @@
       ctx.filter = 'blur(' + blurAmount + 'px)';
       ctx.drawImage(tempCanvas, 0, 0);
       ctx.filter = 'none';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
       ctx.fill();
       ctx.restore();
     }
@@ -713,7 +715,7 @@
       };
 
       try {
-        postPayloadByHiddenForm(payload);
+        await postPayloadByFetch(payload);
       } catch (err) {
         finishAsError('요청 전송에 실패했습니다. 네트워크 상태를 확인해 주세요.');
         return;
@@ -722,32 +724,15 @@
       startPollingResult(currentRequestId);
     }
 
-    function postPayloadByHiddenForm(payload) {
-      const iframeName = 'gasPostFrame_' + payload.requestId.replace(/[^a-zA-Z0-9_]/g, '_');
-      const iframe = document.createElement('iframe');
-      iframe.name = iframeName;
-      iframe.style.display = 'none';
-      iframe.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(iframe);
-
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = GAS_WEB_APP_URL;
-      form.target = iframeName;
-      form.style.display = 'none';
-
-      const input = document.createElement('textarea');
-      input.name = 'payload';
-      input.value = JSON.stringify(payload);
-      form.appendChild(input);
-
-      document.body.appendChild(form);
-      form.submit();
-
-      setTimeout(function() {
-        if (form.parentNode) form.parentNode.removeChild(form);
-        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      }, 25000);
+    async function postPayloadByFetch(payload) {
+      await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify(payload)
+      });
     }
 
     function startPollingResult(requestId) {
@@ -761,7 +746,7 @@
       pollCount++;
 
       if (pollCount > POLL_MAX_COUNT) {
-        finishAsError('검사 결과를 받지 못했습니다. 다시 검사해 주세요.');
+        finishAsError('검사 결과를 받지 못했습니다. 네트워크 상태를 확인해 주세요.');
         return;
       }
 
@@ -782,7 +767,7 @@
           return;
         }
 
-        finishAsError(data.message || '검사 결과를 받지 못했습니다. 다시 검사해 주세요.');
+        finishAsError(data.message || '검사 결과를 받지 못했습니다. 네트워크 상태를 확인해 주세요.');
       };
 
       const script = document.createElement('script');
@@ -864,7 +849,7 @@
 
     function showError(message) {
       resultBox.className = 'resultBox ng';
-      resultSign.textContent = '재검사';
+      resultSign.textContent = '오류';
       resultText.textContent = message;
       helmetPill.textContent = '안전모 -';
       strapPill.textContent = '턱끈 -';
@@ -874,9 +859,9 @@
 
     function cleanErrorMessage(text) {
       const msg = String(text || '').trim();
-      if (!msg) return '검사를 완료하지 못했습니다. 다시 검사해 주세요.';
+      if (!msg) return '검사 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.';
       if (/AI|Gemini|JSON|파싱|HTTP|API|script|server|서버|결과/i.test(msg)) {
-        return '검사를 완료하지 못했습니다. 카메라 화면을 확인한 뒤 다시 검사해 주세요.';
+        return '검사 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.';
       }
       return msg;
     }
@@ -990,7 +975,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.filter = 'blur(50px)';
+      ctx.filter = 'blur(42px)';
       ctx.translate(canvasWidth, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, cover.x, cover.y, cover.width, cover.height);
@@ -998,7 +983,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
       ctx.fill();
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.46)';
@@ -1049,12 +1034,12 @@
     }
 
     function getFallbackOverlayFaceBox(width, height) {
-      const w = width * 0.44;
-      const h = height * 0.50;
+      const w = width * 0.34;
+      const h = height * 0.42;
 
       return {
         x: (width - w) / 2,
-        y: height * 0.24,
+        y: height * 0.30,
         width: w,
         height: h
       };
