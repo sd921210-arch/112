@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwmQ7W2Ne4ov2L0hPot2K-gEXjI6YujGwtAGoSlwxPCy2uIsevgwZ8yBYsCstHE7nfm/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyIiD_UKjwGssNxf090ZjnNqv46VhVXcE0D6fOj9ykCnO86rYMns_g-jmMaYnlCr63g/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -366,8 +366,8 @@
 
     const SAVED_INPUT_KEY = 'safetyInspectionInputsV1';
     const SAVED_INPUT_TTL = 24 * 60 * 60 * 1000;
-    const CAPTURE_MAX_SIDE = 512;
-    const CAPTURE_QUALITY = 0.55;
+    const CAPTURE_MAX_SIDE = 480;
+    const CAPTURE_QUALITY = 0.5;
     const POLL_DELAY = 2200;
     const POLL_MAX_COUNT = 75;
     const FACE_DETECTION_INTERVAL = 450;
@@ -589,7 +589,7 @@
       }
 
       const blurBox = makePrivacyFaceBox(box, outputWidth, outputHeight);
-      blurCanvasArea(ctx, captureCanvas, blurBox, 34, false);
+      blurCanvasArea(ctx, captureCanvas, blurBox, 36, false);
     }
 
     function makeRequestId() {
@@ -664,7 +664,7 @@
       pollCount++;
 
       if (pollCount > POLL_MAX_COUNT) {
-        finishAsError('검사 결과를 받지 못했습니다. 다시 검사해 주세요.');
+        finishAsError('검사 결과를 받지 못했습니다. 다시 검사해 주세요.\n요청ID: ' + requestId);
         return;
       }
 
@@ -684,7 +684,7 @@
           return;
         }
 
-        finishAsError(data.message || '검사 처리 중 문제가 발생했습니다. 다시 검사해 주세요.');
+        finishAsError((data.message || '검사 처리 중 문제가 발생했습니다. 다시 검사해 주세요.') + '\n요청ID: ' + requestId);
       };
 
       script = document.createElement('script');
@@ -880,7 +880,7 @@
 
       ctx.save();
       makeOvalClip(ctx, box);
-      ctx.filter = 'blur(34px)';
+      ctx.filter = 'blur(36px)';
       ctx.translate(canvasWidth, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, cover.x, cover.y, cover.width, cover.height);
@@ -940,8 +940,8 @@
     }
 
     function getFallbackFaceBox(width, height) {
-      const w = width * 0.28;
-      const h = height * 0.36;
+      const w = width * 0.30;
+      const h = height * 0.39;
 
       return {
         x: (width - w) / 2,
@@ -954,8 +954,8 @@
     function makePrivacyFaceBox(box, limitWidth, limitHeight) {
       const cx = box.x + box.width / 2;
       const cy = box.y + box.height / 2 + box.height * 0.08;
-      const width = Math.min(box.width * 0.86, limitWidth);
-      const height = Math.min(box.height * 1.04, limitHeight);
+      const width = Math.min(box.width * 0.96, limitWidth);
+      const height = Math.min(box.height * 1.14, limitHeight);
       const x = Math.max(0, Math.min(cx - width / 2, limitWidth - width));
       const y = Math.max(0, Math.min(cy - height / 2, limitHeight - height));
 
