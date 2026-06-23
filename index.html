@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
   <script>
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxikQnGVe51ZLMZ0TKYyQ3xnMVCEjx6p3hNRwIYIDlOYrJ9B-0102VYCMHxxHBETAKA/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyj7T7iLDRpIArgSYXb4KIbh48CoUAjCSRryt2uXIDj0ihA73X8wFZqQbl2R9SgTF-k/exec';
   </script>
 
   <title>AI 안전모 검사</title>
@@ -385,6 +385,9 @@
     const CAPTURE_SIZE = 288;
     const CAPTURE_QUALITY = 0.42;
     const FACE_DETECTION_INTERVAL = 120;
+    const POLL_INTERVAL_MS = 1500;
+    const POLL_MAX_COUNT = 100;
+    const JSONP_TIMEOUT_MS = 9000;
 
     let stream = null;
     let isAnalyzing = false;
@@ -647,7 +650,7 @@
 
       if (!box) return;
 
-      const blurBox = expandBox(box, CAPTURE_SIZE, CAPTURE_SIZE, 1.12, 1.08, -0.08);
+      const blurBox = expandBox(box, CAPTURE_SIZE, CAPTURE_SIZE, 1.08, 0.86, -0.16);
       blurCanvasArea(ctx, captureCanvas, blurBox, 9);
     }
 
@@ -716,14 +719,7 @@
       setStatus('검사 중');
 
       try {
-        await fetch(GAS_WEB_APP_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
-          },
-          body: JSON.stringify(payload)
-        });
+        postPayloadByHiddenForm(payload);
       } catch (err) {
         finishAsError('요청 전송에 실패했습니다. 네트워크 상태를 확인해 주세요.');
         return;
@@ -732,32 +728,87 @@
       startPollingResult(currentRequestId);
     }
 
+    function postPayloadByHiddenForm(payload) {
+      const iframeName = 'gasPostFrame_' + payload.requestId.replace(/[^a-zA-Z0-9_]/g, '_');
+      const iframe = document.createElement('iframe');
+      iframe.name = iframeName;
+      iframe.style.display = 'none';
+      iframe.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = GAS_WEB_APP_URL;
+      form.target = iframeName;
+      form.style.display = 'none';
+      form.acceptCharset = 'UTF-8';
+
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'payload';
+      input.value = JSON.stringify(payload);
+      form.appendChild(input);
+
+      document.body.appendChild(form);
+      form.submit();
+
+      setTimeout(() => {
+        if (form.parentNode) form.parentNode.removeChild(form);
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      }, 120000);
+    }
+
     function startPollingResult(requestId) {
       clearTimeout(pollTimer);
 
       pollTimer = setTimeout(() => {
         pollResult(requestId);
-      }, 1300);
+      }, POLL_INTERVAL_MS);
     }
 
     function pollResult(requestId) {
       pollCount++;
 
-      if (pollCount > 70) {
-        finishAsError('검사 결과를 받지 못했습니다. 다시 검사해 주세요.');
+      if (pollCount > POLL_MAX_COUNT) {
+        finishAsError('검사 응답이 지연되었습니다. 다시 검사해 주세요.');
         return;
       }
 
       setStatus('검사 중');
 
       const callbackName = '__gasResultCallback_' + requestId.replace(/[^a-zA-Z0-9_]/g, '_') + '_' + pollCount;
+      const script = document.createElement('script');
+      let settled = false;
+      let guardTimer = null;
 
-      window[callbackName] = function(data) {
+      function cleanup() {
         try {
           delete window[callbackName];
         } catch (err) {
           window[callbackName] = undefined;
         }
+
+        if (guardTimer) {
+          clearTimeout(guardTimer);
+          guardTimer = null;
+        }
+
+        if (script && script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      }
+
+      function retryLater() {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        startPollingResult(requestId);
+      }
+
+      window[callbackName] = function(data) {
+        if (settled) return;
+        settled = true;
+        cleanup();
 
         if (!data || data.status === 'PENDING') {
           startPollingResult(requestId);
@@ -777,28 +828,20 @@
         startPollingResult(requestId);
       };
 
-      const script = document.createElement('script');
       script.src =
         GAS_WEB_APP_URL +
         '?action=result' +
         '&requestId=' + encodeURIComponent(requestId) +
         '&callback=' + encodeURIComponent(callbackName) +
-        '&t=' + Date.now();
+        '&t=' + Date.now() + '_' + Math.random().toString(36).slice(2);
 
-      script.onerror = function() {
-        try {
-          delete window[callbackName];
-        } catch (err) {}
-        startPollingResult(requestId);
-      };
+      script.onerror = retryLater;
+
+      guardTimer = setTimeout(() => {
+        retryLater();
+      }, JSONP_TIMEOUT_MS);
 
       document.body.appendChild(script);
-
-      setTimeout(() => {
-        if (script && script.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-      }, 10000);
     }
 
     async function finishAsSuccess(data) {
@@ -849,8 +892,8 @@
     function getSafeErrorMessage(message) {
       const text = String(message || '').trim();
 
-      if (!text) return '검사 결과를 받지 못했습니다. 다시 검사해 주세요.';
-      if (/AI|Gemini|JSON|응답|파싱|HTTP|API/i.test(text)) return '검사 결과를 받지 못했습니다. 다시 검사해 주세요.';
+      if (!text) return '검사 응답이 지연되었습니다. 다시 검사해 주세요.';
+      if (/AI|Gemini|JSON|파싱|HTTP|API/i.test(text)) return '검사 판독이 불안정합니다. 다시 검사해 주세요.';
 
       return text;
     }
@@ -978,7 +1021,7 @@
 
       if (!faceBox) return;
 
-      const blurBox = expandBox(faceBox, width, height, 1.14, 1.12, -0.08);
+      const blurBox = expandBox(faceBox, width, height, 1.10, 0.92, -0.14);
       drawBlurredVideoPatch(ctx, blurBox, width, height);
     }
 
